@@ -997,13 +997,99 @@ void run_debug_tests4(void)
 	/*
 		'Manual' MP2 calculation
 	*/
+
+	struct amatrix_t *amx=init_amatrix("/Users/zakk/Desktop/MPn/psi4/H2O.dat");
+
+	double result=0.0;
+
+	pmatrix_set_entry(amx->pmxs[0],0,0,0);
+	pmatrix_set_entry(amx->pmxs[0],0,1,0);
+	pmatrix_set_entry(amx->pmxs[0],1,0,0);
+	pmatrix_set_entry(amx->pmxs[0],1,1,0);
+	pmatrix_set_entry(amx->pmxs[1],0,0,0);
+	pmatrix_set_entry(amx->pmxs[1],0,1,0);
+	pmatrix_set_entry(amx->pmxs[1],1,0,0);
+	pmatrix_set_entry(amx->pmxs[1],1,1,0);
+
+	for(int i=1;i<=amx->nr_virtual;i++)
+	{
+		for(int j=1;j<=amx->nr_virtual;j++)
+		{
+			for(int a=1;a<=amx->nr_occupied;a++)
+			{
+				for(int b=1;b<=amx->nr_occupied;b++)
+				{
+					pmatrix_set_entry(amx->pmxs[0],0,1,a);
+					pmatrix_set_entry(amx->pmxs[0],1,0,i);
+					pmatrix_set_entry(amx->pmxs[1],0,1,b);
+					pmatrix_set_entry(amx->pmxs[1],1,0,j);
+
+					result+=amatrix_weight(amx);
+
+					bool verbose=false;
+
+					if(verbose==true)
+					{
+
+						printf("%d %d %d %d || %f\n", pmatrix_get_entry(amx->pmxs[0], 0, 1),
+							                      pmatrix_get_entry(amx->pmxs[0], 1, 0),
+						                              pmatrix_get_entry(amx->pmxs[1], 0, 1),
+						                              pmatrix_get_entry(amx->pmxs[1], 1, 0),
+						                              amatrix_weight(amx));
+					}
+				}
+			}
+		}
+	}
+
+	printf("%f\n",result);
+}
+
+
+void run_debug_tests5(void)
+{
+	/*
+		'Manual' MP2 calculation, with stochastic sampling of quantum numbers
+	*/
+
+	struct amatrix_t *amx=init_amatrix("/Users/zakk/Desktop/MPn/psi4/H2O.dat");
+
+	pmatrix_set_entry(amx->pmxs[0],0,0,0);
+	pmatrix_set_entry(amx->pmxs[0],0,1,0);
+	pmatrix_set_entry(amx->pmxs[0],1,0,0);
+	pmatrix_set_entry(amx->pmxs[0],1,1,0);
+	pmatrix_set_entry(amx->pmxs[1],0,0,0);
+	pmatrix_set_entry(amx->pmxs[1],0,1,0);
+	pmatrix_set_entry(amx->pmxs[1],1,0,0);
+	pmatrix_set_entry(amx->pmxs[1],1,1,0);
+
+	double result=0.0;
+	int iterations=50000000;
+
+	for(int c=0;c<iterations;c++)
+	{
+		int i=1+gsl_rng_uniform_int(amx->rng_ctx,amx->nr_virtual);
+		int j=1+gsl_rng_uniform_int(amx->rng_ctx,amx->nr_virtual);
+		int a=1+gsl_rng_uniform_int(amx->rng_ctx,amx->nr_occupied);
+		int b=1+gsl_rng_uniform_int(amx->rng_ctx,amx->nr_occupied);
+
+		pmatrix_set_entry(amx->pmxs[0],0,1,a);
+		pmatrix_set_entry(amx->pmxs[0],1,0,i);
+		pmatrix_set_entry(amx->pmxs[1],0,1,b);
+		pmatrix_set_entry(amx->pmxs[1],1,0,j);
+
+		result+=amatrix_weight(amx);
+	}
+
+	printf("%f\n",result/iterations*pow(amx->nr_virtual*amx->nr_occupied,2.0f));
 }
 
 int main(void)
 {
 	//run_debug_tests();
-	run_debug_tests3b();
-	//do_diagmc("/Users/zakk/Desktop/MPn/psi4/H2O.dat","/Users/zakk/Desktop/MPn/test.dat",1000,10.0f,false);
+	run_debug_tests4();
+	run_debug_tests5();
+	//do_diagmc("/Users/zakk/Desktop/MPn/psi4/H2O.dat","/Users/zakk/Desktop/MPn/test.dat",10000000,100.0f,false);
 
 	return 0;
 }

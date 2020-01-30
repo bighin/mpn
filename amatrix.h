@@ -50,14 +50,14 @@ int amatrix_get_entry(struct amatrix_t *amx, int i, int j);
 
 void amatrix_print(struct amatrix_t *amx);
 
-struct amatrix_stack_t
+struct amatrix_backup_t
 {
 	int dimensions[2];
 	int values[2][IMATRIX_MAX_DIMENSIONS][IMATRIX_MAX_DIMENSIONS];
 };
 
-void amatrix_push(struct amatrix_t *amx, struct amatrix_stack_t *stack);
-void amatrix_pop(struct amatrix_t *amx, struct amatrix_stack_t *stack);
+void amatrix_save(struct amatrix_t *amx, struct amatrix_backup_t *backup);
+void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup);
 
 bool amatrix_check_consistency(struct amatrix_t *amx);
 bool amatrix_is_physical(struct amatrix_t *amx);

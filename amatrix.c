@@ -83,35 +83,32 @@ int amatrix_get_entry(struct amatrix_t *amx, int i, int j)
 }
 
 /*
-	We can save the contents of a amatrix in a 'stack' structure using the 'push' operation,
-	and then (if needed) we can reload the old contents using the 'pop' operation.
-
-	Note that, as of now, the stack has dimension one, and therefore only one matrix can be
-	pushed at a time.
+	We can save the contents of a amatrix in a 'backup' structure using the 'save' operation,
+	and then (if needed) we can reload the old contents using the 'restore' operation.
 */
 
-void amatrix_push(struct amatrix_t *amx, struct amatrix_stack_t *stack)
+void amatrix_save(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 {
-	stack->dimensions[0]=amx->pmxs[0]->dimensions;
-	stack->dimensions[1]=amx->pmxs[1]->dimensions;
+	backup->dimensions[0]=amx->pmxs[0]->dimensions;
+	backup->dimensions[1]=amx->pmxs[1]->dimensions;
 
-	assert(stack->dimensions[0]==stack->dimensions[1]);
-	assert(stack->dimensions[0]<IMATRIX_MAX_DIMENSIONS);
+	assert(backup->dimensions[0]==backup->dimensions[1]);
+	assert(backup->dimensions[0]<IMATRIX_MAX_DIMENSIONS);
 
-	for(int i=0;i<stack->dimensions[0];i++)
+	for(int i=0;i<backup->dimensions[0];i++)
 	{
-		for(int j=0;j<stack->dimensions[0];j++)
+		for(int j=0;j<backup->dimensions[0];j++)
 		{
-			stack->values[0][i][j]=amx->pmxs[0]->values[i][j];
-			stack->values[1][i][j]=amx->pmxs[1]->values[i][j];
+			backup->values[0][i][j]=amx->pmxs[0]->values[i][j];
+			backup->values[1][i][j]=amx->pmxs[1]->values[i][j];
 		}
 	}
 }
 
-void amatrix_pop(struct amatrix_t *amx, struct amatrix_stack_t *stack)
+void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 {
-	amx->pmxs[0]->dimensions=stack->dimensions[0];
-	amx->pmxs[1]->dimensions=stack->dimensions[1];
+	amx->pmxs[0]->dimensions=backup->dimensions[0];
+	amx->pmxs[1]->dimensions=backup->dimensions[1];
 
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions<IMATRIX_MAX_DIMENSIONS);
@@ -120,8 +117,8 @@ void amatrix_pop(struct amatrix_t *amx, struct amatrix_stack_t *stack)
 	{
 		for(int j=0;j<amx->pmxs[0]->dimensions;j++)
 		{
-			amx->pmxs[0]->values[i][j]=stack->values[0][i][j];
-			amx->pmxs[1]->values[i][j]=stack->values[1][i][j];
+			amx->pmxs[0]->values[i][j]=backup->values[0][i][j];
+			amx->pmxs[1]->values[i][j]=backup->values[1][i][j];
 		}
 	}
 }
@@ -325,12 +322,13 @@ double amatrix_weight(struct amatrix_t *amx)
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions>=2);
 
-	struct label_t labels[MAX_LABELS];
-	int ilabels=0;
-
 	if(amatrix_check_connectedness(amx)==false)
 		return 0.0f;
 
+	struct label_t labels[MAX_LABELS];
+	int ilabels=0;
+
 	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, labels, &ilabels);
+
 	return amx->bias+incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysical_penalty, false);
 }

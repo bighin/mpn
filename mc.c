@@ -22,8 +22,8 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	if((amx->pmxs[0]->dimensions+1)>=amx->max_order)
 		return UPDATE_UNPHYSICAL;
 
-	struct amatrix_stack_t astack;
-	amatrix_push(amx, &astack);
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
 
 	int dimensions=amx->pmxs[0]->dimensions;
 	int i,j;
@@ -75,7 +75,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
-		amatrix_pop(amx, &astack);
+		amatrix_restore(amx, &backup);
 		return UPDATE_REJECTED;
 	}
 
@@ -90,8 +90,8 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	if(amx->pmxs[0]->dimensions<=2)
 		return UPDATE_UNPHYSICAL;
 
-	struct amatrix_stack_t astack;
-	amatrix_push(amx, &astack);
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
 
 	int dimensions=amx->pmxs[0]->dimensions;
 	int i,j;
@@ -139,7 +139,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
-		amatrix_pop(amx, &astack);
+		amatrix_restore(amx, &backup);
 		return UPDATE_REJECTED;
 	}
 
@@ -155,8 +155,8 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 
 	double weightratio=1.0f/amatrix_weight(amx);
 
-	struct amatrix_stack_t astack;
-	amatrix_push(amx, &astack);
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
 
 	/*
 		We select which one of the permutation matrices we want to play with
@@ -165,7 +165,7 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
 
 	/*
-		We select thet rows/columns we want to swap.
+		We select the rows/columns we want to swap.
 
 		Note that we are choosing the first one among dims possible choices,
 		and the second one among (dims-1) possible choices
@@ -205,11 +205,66 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	acceptance_ratio*=pow(amx->nr_occupied, reverse[QTYPE_OCCUPIED]);
 	acceptance_ratio*=pow(amx->nr_virtual, reverse[QTYPE_VIRTUAL]);
 
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
-		amatrix_pop(amx, &astack);
+		amatrix_restore(amx, &backup);
+		return UPDATE_REJECTED;
+	}
+
+	return UPDATE_ACCEPTED;
+}
+
+int update_modify(struct amatrix_t *amx, bool always_accept)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
+	assert(amx->pmxs[0]->dimensions>=1);
+
+	double weightratio=1.0f/amatrix_weight(amx);
+
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
+
+	/*
+		We select which one of the permutation matrices we want to play with
+	*/
+
+	struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
+
+	/*
+		We select the row the element we want to modify lies in. Since there's one
+		and only one element per row, we do not need to select a column.
+	*/
+
+#warning LOOK AT ME!
+
+	//for(int repeats=0;repeats<1;repeats++)
+	{
+		int i=gsl_rng_uniform_int(amx->rng_ctx, dimensions);
+
+		for(int j=0;j<dimensions;j++)
+			if(pmatrix_get_entry(target, i, j)!=0)
+				pmatrix_set_entry(target, i, j, pmatrix_get_new_value(target, amx->rng_ctx, i, j));
+	}
+
+	/*
+		The update is balanced with itself, the acceptance ratio is simply given
+		by the (modulus of the) weights ratio.
+	*/
+
+	double acceptance_ratio;
+
+	weightratio*=amatrix_weight(amx);
+	acceptance_ratio=fabs(weightratio);
+
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+
+	if((is_accepted==false)&&(always_accept==false))
+	{
+		amatrix_restore(amx, &backup);
 		return UPDATE_REJECTED;
 	}
 
@@ -251,7 +306,7 @@ void interrupt_handler(int dummy __attribute__((unused)))
 int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimit,bool show_progressbar)
 {
 
-#define DIAGRAM_NR_UPDATES	(3)
+#define DIAGRAM_NR_UPDATES	(4)
 
 	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx,bool always_accept);
 	char *update_names[DIAGRAM_NR_UPDATES];
@@ -266,10 +321,12 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 	updates[0]=update_extend;
 	updates[1]=update_squeeze;
 	updates[2]=update_shuffle;
+	updates[3]=update_modify;
 
 	update_names[0]="Extend";
 	update_names[1]="Squeeze";
 	update_names[2]="Shuffle";
+	update_names[3]="Modify";
 
 	/*
 		We reset the update statistics
@@ -309,9 +366,9 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 
 	struct amatrix_t *amx=init_amatrix(energies_dot_dat);
 
-	amx->bias=0.1f;
-	amx->unphysical_penalty=0.1f;
-	amx->max_order=16;
+	amx->bias=0.0f;
+	amx->unphysical_penalty=0.01f;
+	amx->max_order=2;
 
 	/*
 		We setup an interrupt handler to gracefully handle a CTRL-C, and initialize a structure needed
@@ -381,6 +438,11 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 
 			double weight=amatrix_weight(amx);
 
+			//printf("%d %d %d %d || %f\n",pmatrix_get_entry(amx->pmxs[0],0,1),
+			//                             pmatrix_get_entry(amx->pmxs[0],1,0),
+			//                             pmatrix_get_entry(amx->pmxs[1],0,1),
+			//                             pmatrix_get_entry(amx->pmxs[1],1,0),weight);
+
 			average_weight+=weight;
 			average_squared_weight+=weight*weight;
 			nr_samples++;
@@ -412,7 +474,7 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 
 	if(keep_running==0)
 	{
-		printf("Caught SIGINT, exiting earlier.\n");
+		printf("Caught SIGINT or time limit exceeded, exiting earlier.\n");
 	}
 
 	if(show_progressbar)
