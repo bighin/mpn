@@ -2,6 +2,7 @@
 #include <curses.h>
 #include <term.h>
 #include <assert.h>
+#include <string.h>
 
 #include "auxx.h"
 
@@ -35,6 +36,14 @@ void seed_rng(gsl_rng *rng)
 double factorial(int i)
 {
 	return tgamma(i+1);
+}
+
+char get_nth_character(char *s,size_t n)
+{
+	if(n<strlen(s))
+		return s[n];
+
+	return '_';
 }
 
 /*

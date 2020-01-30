@@ -9,6 +9,8 @@ void seed_rng(gsl_rng *rng);
 
 double factorial(int i);
 
+char get_nth_character(char *s,size_t n);
+
 void gsl_matrix_int_print(gsl_matrix_int *m);
 void gsl_matrix_int_mul(gsl_matrix_int *A,gsl_matrix_int *B,gsl_matrix_int *C);
 void gsl_matrix_int_power(gsl_matrix_int *M,gsl_matrix_int *N,int i);

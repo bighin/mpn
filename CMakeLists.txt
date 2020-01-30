@@ -26,7 +26,7 @@ include_directories(${GSL_INCLUDE_DIR})
 find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
 
-add_executable(mpn mpn.c mpn.h amatrix.c amatrix.h auxx.c auxx.h pmatrix.c pmatrix.h reader.c reader.h mc.c mc.h libprogressbar/progressbar.c libprogressbar/progressbar.h)
+add_executable(mpn mpn.c mpn.h amatrix.c amatrix.h auxx.c auxx.h pmatrix.c pmatrix.h reader.c reader.h mc.c mc.h libprogressbar/progressbar.c libprogressbar/progressbar.h main.c)
 
 target_link_libraries(mpn ${GSL_LIBRARIES})
 target_link_libraries(mpn ${CURSES_LIBRARIES})

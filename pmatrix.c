@@ -152,6 +152,9 @@ int pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *ta
 	        | 1 0 0 | --> | 1 0 0 0 |
  	        | 0 1 0 |     | 0 1 0 0 |
         		      | 0 0 0 1 |
+
+		In case we take the a) option we return 1 and we save the coordinates of the projected
+		entry in (targeti,targetj). Otherwise we return 2 and (targeti,targetj) is left untouched.
 	*/
 
 	if(selector<pmx->dimensions)
@@ -283,7 +286,10 @@ int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *t
 		assert(pmatrix_get_entry(pmx, pmx->dimensions-1, j2)==0);
 
 	/*
-		Finally we can squeeze the matrix
+		Finally we can squeeze the matrix.
+
+		In case the element to remove is in the bottom right corner,
+		we return 2 and (targeti,targetj) is left untouched...
 	*/
 
 	if(i==(pmx->dimensions-1))
@@ -295,6 +301,13 @@ int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *t
 
 		return 2;
 	}
+
+	/*
+		...otherwise two different entries on the last row and column are being
+		removed, and a new entry is added to the matrix.
+
+		We return 1 and we save the coordinates of this new entry in (targeti,targetj).
+	*/
 
 	assert(pmatrix_get_entry(pmx, i, pmx->dimensions-1)!=0);
 	assert(pmatrix_get_entry(pmx, pmx->dimensions-1, j)!=0);

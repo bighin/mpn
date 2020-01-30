@@ -32,10 +32,11 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	{
 		case 1:
 		probability/=((dimensions+1)*amx->nr_virtual*amx->nr_occupied);
-		probability*=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED) ? (amx->nr_occupied) : (amx->nr_virtual);
+		probability*=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_occupied):(amx->nr_virtual);
 		break;
 
 		case 2:
+		assert(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL);
 		probability/=((dimensions+1)*amx->nr_virtual);
 		break;
 
@@ -53,6 +54,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 		break;
 
 		case 2:
+		assert(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL);
 		probability/=((dimensions+1)*amx->nr_virtual);
 		break;
 
@@ -100,7 +102,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	{
 		case 1:
 		probability*=(dimensions*amx->nr_virtual*amx->nr_occupied);
-		probability/=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED) ? (amx->nr_occupied) : (amx->nr_virtual);
+		probability/=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_occupied):(amx->nr_virtual);
 		break;
 
 		case 2:
@@ -135,7 +137,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	weightratio*=amatrix_weight(amx);
 	acceptance_ratio=fabs(weightratio)*probability;
 
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
@@ -239,9 +241,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 		and only one element per row, we do not need to select a column.
 	*/
 
-#warning LOOK AT ME!
-
-	//for(int repeats=0;repeats<1;repeats++)
+	for(int repeats=0;repeats<1;repeats++)
 	{
 		int i=gsl_rng_uniform_int(amx->rng_ctx, dimensions);
 
