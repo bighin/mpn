@@ -590,7 +590,7 @@ void run_debug_tests5(void)
 int main(void)
 {
 	//run_debug_tests();
-	//run_debug_tests4();
+	run_debug_tests3();
 	//run_debug_tests5();
 	//do_diagmc("/Users/zakk/Desktop/MPn/psi4/H2O.dat","/Users/zakk/Desktop/MPn/test.dat",10000000,100.0f,false);
 
