@@ -1,6 +1,5 @@
 #include <math.h>
 #include <curses.h>
-#include <term.h>
 #include <assert.h>
 #include <string.h>
 
@@ -147,4 +146,14 @@ bool columns_are_identical(gsl_matrix_int *m, size_t col1, size_t col2)
 	}
 
 	return true;
+}
+
+int positive_part(int x)
+{
+	return (x>0)?(x):(0);
+}
+
+int negative_part(int x)
+{
+	return (x<0)?(-x):(0);
 }

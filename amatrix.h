@@ -1,11 +1,11 @@
-#ifndef __CMATRIX_H__
-#define __CMATRIX_H__
+#ifndef __AMATRIX_H__
+#define __AMATRIX_H__
 
 #include <stdbool.h>
 #include <gsl/gsl_rng.h>
 
 #include "pmatrix.h"
-#include "reader.h"
+#include "loaderis.h"
 
 /*
 	The 'amatrix' struct: a matrix following a certain set of rules,
@@ -39,8 +39,8 @@ struct amatrix_t
 		Various parameters
 	*/
 
-	double bias,unphysical_penalty;
-	int max_order;
+	double bias,unphysicalpenalty;
+	int minorder,maxorder;
 };
 
 struct amatrix_t *init_amatrix(char *energies_dot_dat);
@@ -68,4 +68,4 @@ void amatrix_to_wolfram(struct amatrix_t *amx);
 bool amatrix_check_connectedness(struct amatrix_t *amx);
 double amatrix_weight(struct amatrix_t *amx);
 
-#endif //__CMATRIX_H__
+#endif //__AMATRIX_H__

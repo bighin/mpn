@@ -8,7 +8,7 @@
 #include "amatrix.h"
 #include "pmatrix.h"
 #include "auxx.h"
-#include "reader.h"
+#include "loaderis.h"
 
 /*
 	For this function and the next one, see Szabo-Ostlund, page 360.
@@ -268,7 +268,7 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 		}
 
 		/*
-			We have to convert the quantum numbers into the format used by get_htensor()
+			We have to convert the quantum numbers into the format used by get_eri()
 		*/
 
 		int i1,i2,i3,i4;
@@ -278,7 +278,7 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 		i3=labels[mels[i][2]].value-1+((labels[mels[i][2]].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
 		i4=labels[mels[i][3]].value-1+((labels[mels[i][3]].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
 
-		numerators*=get_htensor(ectx,i1,i2,i3,i4);
+		numerators*=get_eri(ectx, i1, i2, i3, i4);
 	}
 
 	if(verbose==true)

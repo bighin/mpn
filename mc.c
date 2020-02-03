@@ -7,6 +7,7 @@
 #include "amatrix.h"
 #include "auxx.h"
 #include "mpn.h"
+#include "config.h"
 
 #include "libprogressbar/progressbar.h"
 
@@ -19,7 +20,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	double weightratio=1.0f/amatrix_weight(amx);
 	double probability=1.0f;
 
-	if((amx->pmxs[0]->dimensions+1)>=amx->max_order)
+	if(amx->pmxs[0]->dimensions>=amx->maxorder)
 		return UPDATE_UNPHYSICAL;
 
 	struct amatrix_backup_t backup;
@@ -36,8 +37,8 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 		break;
 
 		case 2:
-		assert(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL);
-		probability/=((dimensions+1)*amx->nr_virtual);
+		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
+		probability/=((dimensions+1)*amx->nr_occupied);
 		break;
 
 		case -1:
@@ -54,8 +55,8 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 		break;
 
 		case 2:
-		assert(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL);
-		probability/=((dimensions+1)*amx->nr_virtual);
+		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
+		probability/=((dimensions+1)*amx->nr_occupied);
 		break;
 
 		case -1:
@@ -69,6 +70,9 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	*/
 
 	double acceptance_ratio;
+
+#warning DEBUG INFO BELOW!
+	//printf("Extend update weight ratio is: %f/%f = %f\n",amatrix_weight(amx),1.0f/weightratio,weightratio/amatrix_weight(amx));
 
 	weightratio*=amatrix_weight(amx);
 	acceptance_ratio=fabs(weightratio)*probability;
@@ -89,7 +93,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	double weightratio=1.0f/amatrix_weight(amx);
 	double probability=1.0f;
 
-	if(amx->pmxs[0]->dimensions<=2)
+	if(amx->pmxs[0]->dimensions<=1)
 		return UPDATE_UNPHYSICAL;
 
 	struct amatrix_backup_t backup;
@@ -106,7 +110,8 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 		break;
 
 		case 2:
-		probability*=(dimensions*amx->nr_virtual);
+		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
+		probability*=(dimensions*amx->nr_occupied);
 		break;
 
 		case -1:
@@ -123,7 +128,8 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 		break;
 
 		case 2:
-		probability*=(dimensions*amx->nr_virtual);
+		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
+		probability*=(dimensions*amx->nr_occupied);
 		break;
 
 		case -1:
@@ -154,6 +160,13 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions>=1);
+
+	/*
+		If we are in dimension 1, there's nothing to shuffle.
+	*/
+
+	if(dimensions==1)
+		return UPDATE_UNPHYSICAL;
 
 	double weightratio=1.0f/amatrix_weight(amx);
 
@@ -303,7 +316,7 @@ void interrupt_handler(int dummy __attribute__((unused)))
 	The actual DiagMC routine.
 */
 
-int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimit,bool show_progressbar)
+int do_diagmc(struct configuration_t *config)
 {
 
 #define DIAGRAM_NR_UPDATES	(4)
@@ -349,9 +362,14 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 		We print some informative message, and then we open the log file
 	*/
 
-	fprintf(stderr,"Performing %d iterations\n",iterations);
+	fprintf(stderr,"Performing %d iterations\n",config->iterations);
 
 	FILE *out;
+	char output[1024];
+
+	snprintf(output,1024,"%s.dat",config->prefix);
+	output[1023]='\0';
+
 	if(!(out=fopen(output,"w+")))
 	{
 		fprintf(stderr,"Error: couldn't open %s for writing\n",output);
@@ -364,11 +382,12 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 		The diagram parameters are loaded from the configuration, and then a new 'amatrix' is created
 	*/
 
-	struct amatrix_t *amx=init_amatrix(energies_dot_dat);
+	struct amatrix_t *amx=init_amatrix(config->erisfile);
 
-	amx->bias=0.0f;
-	amx->unphysical_penalty=0.01f;
-	amx->max_order=2;
+	amx->bias=config->bias;
+	amx->unphysicalpenalty=config->unphysicalpenalty;
+	amx->minorder=config->minorder;
+	amx->maxorder=config->maxorder;
 
 	/*
 		We setup an interrupt handler to gracefully handle a CTRL-C, and initialize a structure needed
@@ -380,8 +399,8 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 
 	progressbar *progress;
 
-	if(show_progressbar==true)
-		progress=progressbar_new("Progress",iterations/16384);
+	if(config->progressbar==true)
+		progress=progressbar_new("Progress",config->iterations/16384);
 	else
 		progress=NULL;
 
@@ -396,7 +415,7 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 		This is the main DiagMC loop
 	*/
 
-	for(int c=0;(c<iterations)&&(keep_running==1);c++)
+	for(int c=0;(c<config->iterations)&&(keep_running==1);c++)
 	{
 		int update_type,status;
 
@@ -431,26 +450,25 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 
 		if(amatrix_is_physical(amx))
 		{
-			/*
-				TODO: one can get the weight for free since it has already been calculated!
-				We can just cache the result!
-			*/
+			if((c>config->thermalization)&&((nr_samples%config->decorrelation)==0))
+			{
+#warning Read this!
+				/*
+					TODO: one can get the weight for free since it has already been calculated!
+					We can just cache the result!
+				*/
 
-			double weight=amatrix_weight(amx);
+				double weight=amatrix_weight(amx);
 
-			//printf("%d %d %d %d || %f\n",pmatrix_get_entry(amx->pmxs[0],0,1),
-			//                             pmatrix_get_entry(amx->pmxs[0],1,0),
-			//                             pmatrix_get_entry(amx->pmxs[1],0,1),
-			//                             pmatrix_get_entry(amx->pmxs[1],1,0),weight);
+				average_weight+=weight;
+				average_squared_weight+=weight*weight;
+				nr_samples++;
 
-			average_weight+=weight;
-			average_squared_weight+=weight*weight;
-			nr_samples++;
-
-			if(weight>0.0f)
-				nr_positive++;
-			else
-				nr_negative++;
+				if(weight>0.0f)
+					nr_positive++;
+				else
+					nr_negative++;
+			}
 		}
 
 		if((c%16384)==0)
@@ -458,7 +476,7 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 			struct timeval now;
 			double elapsedtime;
 
-			if(show_progressbar==true)
+			if(config->progressbar==true)
 				progressbar_inc(progress);
 
 			gettimeofday(&now,NULL);
@@ -467,7 +485,7 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 			elapsedtime+=(now.tv_usec-starttime.tv_usec)/1000.0;
 			elapsedtime/=1000;
 
-			if((timelimit>0.0f)&&(elapsedtime>timelimit))
+			if((config->timelimit>0.0f)&&(elapsedtime>config->timelimit))
 				keep_running=0;
 		}
 	}
@@ -477,7 +495,7 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 		printf("Caught SIGINT or time limit exceeded, exiting earlier.\n");
 	}
 
-	if(show_progressbar)
+	if(config->progressbar)
 		progressbar_finish(progress);
 
 	fini_amatrix(amx);
@@ -488,7 +506,7 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 
 	fprintf(out,"# Diagrammatic Monte Carlo for Møller-Plesset theory\n");
 	fprintf(out,"#\n");
-	fprintf(out,"# Electron repulsion integrals loaded from '%s'\n",energies_dot_dat);
+	fprintf(out,"# Electron repulsion integrals loaded from '%s'\n",config->erisfile);
 	fprintf(out,"# Output file is '%s'\n",output);
 	fprintf(out,"#\n");
 	fprintf(out,"#\n");
@@ -512,7 +530,7 @@ int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimi
 	fprintf(out,"#\n");
 	fprintf(out,"# Sampled quantity: Correlation energy\n");
 	fprintf(out,"#\n");
-	fprintf(out,"# Iterations: %d\n",iterations);
+	fprintf(out,"# Iterations: %d\n",config->iterations);
 	fprintf(out,"# Samples in the physical sector: %f%%\n",100.0f*((double)(nr_samples))/((double)(nr_samples_including_unphysical)));
 
 	/*

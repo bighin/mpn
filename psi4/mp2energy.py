@@ -78,14 +78,20 @@ print_array(eps[:nocc])
 print("evirt", end = " ")
 print_array(eps[nocc:])
 
-#for i in range(nocc):
-#    for a in range(nocc,nso):
-#        for j in range(nocc):
-#            for b in range(nocc,nso):
-#                print("htensor",i,j,a,b,I_mo[i,j,a,b])
+print ("hfe %4.11f" % SCF_E)
+print("enuc",mol.nuclear_repulsion_energy())
+
+H=np.asarray(mints.ao_kinetic()) + np.asarray(mints.ao_potential())
+C_nparray = np.asarray(C)
+mo_H = np.dot(np.dot(C_nparray.T, H), C_nparray)
+mo_Hdiag = mo_H.diagonal()
+mo_Hdiag = np.repeat(mo_Hdiag,2)
+
+print("hdiag", end = " ")
+print_array(mo_Hdiag[:nocc])
 
 for i in range(nso):
     for a in range(nso):
         for j in range(nso):
             for b in range(nso):
-                print("htensor",i,j,a,b,I_mo[i,j,a,b])
+                print("eri",i,j,a,b,I_mo[i,j,a,b])

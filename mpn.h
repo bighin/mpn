@@ -5,7 +5,7 @@
 
 #include <gsl/gsl_matrix.h>
 
-#include "reader.h"
+#include "loaderis.h"
 #include "amatrix.h"
 
 struct label_t
@@ -31,7 +31,5 @@ struct label_t
 
 double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct energies_ctx_t *ectx,double unphysical_penalty,bool verbose);
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels);
-
-int do_diagmc(char *energies_dot_dat,char *output,int iterations,double timelimit,bool show_progressbar);
 
 #endif //__MPN_H__

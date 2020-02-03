@@ -6,6 +6,7 @@
 
 #include "pmatrix.h"
 #include "mpn.h"
+#include "auxx.h"
 
 struct pmatrix_t *init_pmatrix(int nr_occupied,int nr_virtual,gsl_rng *rngctx)
 {
@@ -13,7 +14,7 @@ struct pmatrix_t *init_pmatrix(int nr_occupied,int nr_virtual,gsl_rng *rngctx)
 
 	assert(ret);
 
-	ret->dimensions=2;
+	ret->dimensions=1;
 	ret->nr_occupied=nr_occupied;
 	ret->nr_virtual=nr_virtual;
 
@@ -326,16 +327,6 @@ int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *t
 	return 1;
 }
 
-int positive_part(int x)
-{
-	return (x>0)?(x):(0);
-}
-
-int negative_part(int x)
-{
-	return (x<0)?(-x):(0);
-}
-
 void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx)
 {
 	assert(i1>=0);
@@ -619,7 +610,7 @@ bool pmatrix_check_consistency(struct pmatrix_t *pmx)
 
 			if((entry=pmatrix_get_entry(pmx, i, j))!=0)
 			{
-				if(i<j)
+				if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
 				{
 					if(!((entry>0)&&(entry<=pmx->nr_occupied)))
 						return false;
@@ -638,7 +629,7 @@ bool pmatrix_check_consistency(struct pmatrix_t *pmx)
 
 int pmatrix_entry_type(int i,int j)
 {
-	if(i<j)
+	if(i<=j)
 		return QTYPE_OCCUPIED;
 
 	return QTYPE_VIRTUAL;

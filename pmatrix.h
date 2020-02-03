@@ -1,5 +1,5 @@
-#ifndef __IMATRIX_H__
-#define __IMATRIX_H__
+#ifndef __PMATRIX_H__
+#define __PMATRIX_H__
 
 #include <gsl/gsl_rng.h>
 
@@ -41,4 +41,4 @@ int pmatrix_get_new_occupied_value(struct pmatrix_t *pmx, gsl_rng *rngctx);
 int pmatrix_get_new_virtual_value(struct pmatrix_t *pmx, gsl_rng *rngctx);
 int pmatrix_get_new_value(struct pmatrix_t *pmx, gsl_rng *rngctx, int i, int j);
 
-#endif //__IMATRIX_H__
+#endif //__PMATRIX_H__

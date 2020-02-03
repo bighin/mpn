@@ -15,6 +15,7 @@ struct configuration_t
 
 	double bias;
 	double unphysicalpenalty;
+	int minorder,maxorder;
 
 	/* "sampling" section */
 

@@ -8,8 +8,9 @@
 #include "amatrix.h"
 #include "pmatrix.h"
 #include "auxx.h"
-#include "reader.h"
+#include "loaderis.h"
 #include "mpn.h"
+#include "multiplicity.h"
 
 struct amatrix_t *init_amatrix(char *energies_dot_dat)
 {
@@ -39,8 +40,8 @@ struct amatrix_t *init_amatrix(char *energies_dot_dat)
 	ret->pmxs[1]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);
 
 	ret->bias=0.0f;
-	ret->unphysical_penalty=1.0f;
-	ret->max_order=16;
+	ret->unphysicalpenalty=1.0f;
+	ret->maxorder=16;
 
 	return ret;
 }
@@ -157,7 +158,10 @@ void amatrix_print(struct amatrix_t *amx)
 
 bool amatrix_check_consistency(struct amatrix_t *amx)
 {
-	if((amx->pmxs[0]->dimensions<2)||(amx->pmxs[1]->dimensions<2))
+	if((amx->pmxs[0]->dimensions<1)||(amx->pmxs[1]->dimensions<1))
+		return false;
+
+	if(amx->pmxs[0]->dimensions!=amx->pmxs[1]->dimensions)
 		return false;
 
 	return pmatrix_check_consistency(amx->pmxs[0])&&pmatrix_check_consistency(amx->pmxs[1]);
@@ -166,6 +170,20 @@ bool amatrix_check_consistency(struct amatrix_t *amx)
 bool amatrix_is_physical(struct amatrix_t *amx)
 {
 	int dimensions=amx->pmxs[0]->dimensions;
+
+	/*
+		In dimension 1 the logic is the inverted, the matrices MUST
+		have non-zero elements on the diagonal.
+	*/
+
+	if(dimensions==1)
+	{
+		if((pmatrix_get_entry(amx->pmxs[0], 0, 0)!=0)&&
+		   (pmatrix_get_entry(amx->pmxs[1], 0, 0)!=0))
+			return true;
+		else
+			return false;
+	}
 
 	for(int i=0;i<dimensions;i++)
 	{
@@ -233,27 +251,14 @@ void amatrix_to_wolfram(struct amatrix_t *amx)
 	printf("}\n");
 }
 
-int gsl_matrix_int_add_alt(gsl_matrix_int *dest,gsl_matrix_int *src)
-{
-	if((dest->size1!=src->size1)||(dest->size2!=src->size2))
-		return GSL_FAILURE;
-
-	for(size_t i=0;i<src->size1;i++)
-	{
-		for(size_t j=0;j<src->size2;j++)
-		{
-			int value=gsl_matrix_int_get(dest,i,j)+gsl_matrix_int_get(src,i,j);
-
-			gsl_matrix_int_set(dest,i,j,value);
-		}
-	}
-
-	return GSL_SUCCESS;
-}
-
 bool amatrix_check_connectedness(struct amatrix_t *amx)
 {
 	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(dimensions>=1);
+	if(dimensions==1)
+		return true;
+
 	bool result=true;
 
 	gsl_matrix_int *adjacency=gsl_matrix_int_alloc(dimensions, dimensions);
@@ -286,7 +291,7 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 			The power-th power is added to to C
 		*/
 
-		gsl_matrix_int_add_alt(C,powers);
+		gsl_matrix_int_add(C,powers);
 
 		/*
 			The (power+1)-th power is calculated
@@ -320,15 +325,46 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 double amatrix_weight(struct amatrix_t *amx)
 {
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
-	assert(amx->pmxs[0]->dimensions>=2);
+	assert(amx->pmxs[0]->dimensions>=1);
 
 	if(amatrix_check_connectedness(amx)==false)
 		return 0.0f;
+
+	/*
+		Dimension 1 is a special case that does not need the evaluation
+		of the incidence matrix.
+	*/
+
+	if(amx->pmxs[0]->dimensions==1)
+	{
+		int a,b;
+		double weight=0.0f,multiplicity;
+
+		a=pmatrix_get_entry(amx->pmxs[0],0,0);
+		b=pmatrix_get_entry(amx->pmxs[1],0,0);
+
+		if(a==b)
+			weight+=get_hdiag(amx->ectx,a-1);
+
+		weight+=0.5*get_eri(amx->ectx,a-1,b-1,a-1,b-1);
+		weight+=get_enuc(amx->ectx)*pow(amx->nr_occupied,-2.0f);
+
+#warning Is this correct?
+
+		multiplicity=1.0f;
+
+		return amx->bias+multiplicity*weight;
+	}
 
 	struct label_t labels[MAX_LABELS];
 	int ilabels=0;
 
 	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, labels, &ilabels);
 
-	return amx->bias+incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysical_penalty, false);
+	double weight,multiplicity;
+
+	weight=incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysicalpenalty, false);
+	multiplicity=amatrix_multiplicity(amx);
+
+	return amx->bias+weight/multiplicity;
 }

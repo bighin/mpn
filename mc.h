@@ -2,6 +2,7 @@
 #define __MC_H__
 
 #include "amatrix.h"
+#include "config.h"
 
 #define UPDATE_UNPHYSICAL       (0)
 #define UPDATE_REJECTED         (1)
@@ -11,5 +12,7 @@
 int update_shuffle(struct amatrix_t *amx, bool always_accept);
 int update_extend(struct amatrix_t *amx, bool always_accept);
 int update_squeeze(struct amatrix_t *amx, bool always_accept);
+
+int do_diagmc(struct configuration_t *config);
 
 #endif //__MC_H__

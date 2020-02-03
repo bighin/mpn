@@ -2,10 +2,13 @@
 #include <stdbool.h>
 #include <math.h>
 #include <assert.h>
+#include <stdarg.h>
 
 #include "amatrix.h"
 #include "mpn.h"
 #include "mc.h"
+#include "multiplicity.h"
+#include "config.h"
 
 void run_debug_tests(void)
 {
@@ -50,7 +53,7 @@ void run_debug_tests(void)
 			amatrix_to_python(amx);
 			amatrix_to_wolfram(amx);
 			gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, labels, &ilabels);
-			incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysical_penalty, true);
+			incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysicalpenalty, true);
 			gsl_matrix_int_free(incidence);
 
 			exit(0);
@@ -174,7 +177,7 @@ void run_debug_tests2(void)
 	amatrix_to_python(amx);
 	amatrix_to_wolfram(amx);
 	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, labels, &ilabels);
-	incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysical_penalty, true);
+	incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysicalpenalty, true);
 	gsl_matrix_int_free(incidence);
 }
 
@@ -548,7 +551,6 @@ void run_debug_tests4(void)
 	printf("%f\n",result);
 }
 
-
 void run_debug_tests5(void)
 {
 	/*
@@ -587,12 +589,262 @@ void run_debug_tests5(void)
 	printf("%f\n",result/iterations*pow(amx->nr_virtual*amx->nr_occupied,2.0f));
 }
 
-int main(void)
+void run_debug_tests6(void)
+{
+	struct amatrix_t *amx=init_amatrix("/Users/zakk/Desktop/MPn/psi4/H2O.dat");
+
+	double result=0.0;
+
+	for(int a=0;a<amx->nr_occupied;a++)
+	{
+		for(int b=0;b<amx->nr_occupied;b++)
+		{
+			if(a==b)
+			{
+				printf("[%f]\n",get_occupied_energy(amx->ectx, a));
+				result+=get_occupied_energy(amx->ectx, a);
+			}
+
+			//result+=0.5*get_eri(amx->ectx,a,b,a,b);
+		}
+	}
+
+	printf("%f\n",result);
+}
+
+void run_debug_tests7(void)
+{
+	/*
+		'Manual' Hartree-Fock calculation
+	*/
+
+	struct amatrix_t *amx=init_amatrix("/Users/zakk/Desktop/MPn/psi4/H2O.dat");
+
+	double result=0.0;
+
+	pmatrix_set_entry(amx->pmxs[0],0,0,0);
+	pmatrix_set_entry(amx->pmxs[1],0,0,0);
+
+	for(int a=1;a<=amx->nr_occupied;a++)
+	{
+		for(int b=1;b<=amx->nr_occupied;b++)
+		{
+			pmatrix_set_entry(amx->pmxs[0], 0, 0, a);
+			pmatrix_set_entry(amx->pmxs[1], 0, 0, b);
+
+			result+=amatrix_weight(amx);
+
+			bool verbose=false;
+
+			if(verbose==true)
+			{
+
+				printf("%d %d %d %d || %f\n", pmatrix_get_entry(amx->pmxs[0], 0, 1),
+				       pmatrix_get_entry(amx->pmxs[0], 1, 0), pmatrix_get_entry(amx->pmxs[1], 0, 1),
+				       pmatrix_get_entry(amx->pmxs[1], 1, 0), amatrix_weight(amx));
+			}
+		}
+	}
+
+	printf("%f\n",result);
+}
+
+void run_debug_tests3c(void)
+{
+	struct amatrix_t *amx=init_amatrix("/Users/zakk/Desktop/MPn/psi4/H2O.dat");
+
+	double connected,not_connected;
+
+	amx->pmxs[0]->dimensions=amx->pmxs[1]->dimensions=3;
+	connected=not_connected=0;
+
+	for(int i=0;i<6;i++)
+	{
+		for(int j=0;j<6;j++)
+		{
+			gsl_matrix_int *a,*b;
+
+			a=permutation_to_matrix(permutations3[i],3);
+			b=permutation_to_matrix(permutations3[j],3);
+
+			for(int k=0;k<3;k++)
+			{
+				for(int l=0;l<3;l++)
+				{
+					amx->pmxs[0]->values[k][l]=gsl_matrix_int_get(a, k, l);
+					amx->pmxs[1]->values[k][l]=gsl_matrix_int_get(b, k, l);
+				}
+			}
+
+			if(amatrix_is_physical(amx)==true)
+			{
+				if(amatrix_check_connectedness(amx)==true)
+					connected+=1.0f/amatrix_multiplicity(amx);
+				else
+					not_connected+=1.0f/amatrix_multiplicity(amx);
+			}
+
+			gsl_matrix_int_free(a);
+			gsl_matrix_int_free(b);
+		}
+	}
+
+	printf("%f %f\n",connected,not_connected);
+
+	amx->pmxs[0]->dimensions=amx->pmxs[1]->dimensions=4;
+	connected=not_connected=0;
+
+	for(int i=0;i<24;i++)
+	{
+		for(int j=0;j<24;j++)
+		{
+			gsl_matrix_int *a,*b;
+
+			a=permutation_to_matrix(permutations4[i],4);
+			b=permutation_to_matrix(permutations4[j],4);
+
+			for(int k=0;k<4;k++)
+			{
+				for(int l=0;l<4;l++)
+				{
+					amx->pmxs[0]->values[k][l]=gsl_matrix_int_get(a, k, l);
+					amx->pmxs[1]->values[k][l]=gsl_matrix_int_get(b, k, l);
+				}
+			}
+
+			if(amatrix_is_physical(amx)==true)
+			{
+				if(amatrix_check_connectedness(amx)==true)
+					connected+=1.0f/amatrix_multiplicity(amx);
+				else
+					not_connected+=1.0f/amatrix_multiplicity(amx);
+			}
+
+			gsl_matrix_int_free(a);
+			gsl_matrix_int_free(b);
+		}
+	}
+
+	printf("%f %f\n",connected,not_connected);
+
+	amx->pmxs[0]->dimensions=amx->pmxs[1]->dimensions=5;
+	connected=not_connected=0;
+
+	for(int i=0;i<120;i++)
+	{
+		for(int j=0;j<120;j++)
+		{
+			gsl_matrix_int *a,*b;
+
+			a=permutation_to_matrix(permutations5[i],5);
+			b=permutation_to_matrix(permutations5[j],5);
+
+			for(int k=0;k<5;k++)
+			{
+				for(int l=0;l<5;l++)
+				{
+					amx->pmxs[0]->values[k][l]=gsl_matrix_int_get(a, k, l);
+					amx->pmxs[1]->values[k][l]=gsl_matrix_int_get(b, k, l);
+				}
+			}
+
+			if(amatrix_is_physical(amx)==true)
+			{
+				if(amatrix_check_connectedness(amx)==true)
+					connected+=1.0f/amatrix_multiplicity(amx);
+				else
+					not_connected+=1.0f/amatrix_multiplicity(amx);
+			}
+
+			gsl_matrix_int_free(a);
+			gsl_matrix_int_free(b);
+		}
+	}
+
+	printf("%f %f\n",connected,not_connected);
+
+	amx->pmxs[0]->dimensions=amx->pmxs[1]->dimensions=6;
+	connected=not_connected=0;
+
+	for(int i=0;i<720;i++)
+	{
+		for(int j=0;j<720;j++)
+		{
+			gsl_matrix_int *a,*b;
+
+			a=permutation_to_matrix(permutations6[i],6);
+			b=permutation_to_matrix(permutations6[j],6);
+
+			for(int k=0;k<6;k++)
+			{
+				for(int l=0;l<6;l++)
+				{
+					amx->pmxs[0]->values[k][l]=gsl_matrix_int_get(a, k, l);
+					amx->pmxs[1]->values[k][l]=gsl_matrix_int_get(b, k, l);
+				}
+			}
+
+			if(amatrix_is_physical(amx)==true)
+			{
+				if(amatrix_check_connectedness(amx)==true)
+					connected+=1.0f/amatrix_multiplicity(amx);
+				else
+					not_connected+=1.0f/amatrix_multiplicity(amx);
+			}
+
+			gsl_matrix_int_free(a);
+			gsl_matrix_int_free(b);
+		}
+	}
+
+	printf("%f %f\n",connected,not_connected);
+}
+
+int old_main(void)
 {
 	//run_debug_tests();
-	run_debug_tests3();
+	//run_debug_tests3();
+	//run_debug_tests3b();
+	//run_debug_tests4();
 	//run_debug_tests5();
-	//do_diagmc("/Users/zakk/Desktop/MPn/psi4/H2O.dat","/Users/zakk/Desktop/MPn/test.dat",10000000,100.0f,false);
+	//run_debug_tests6();
+	//run_debug_tests7();
+	//run_debug_tests3c();
+	//do_diagmc("/Users/zakk/Desktop/MPn/psi4/H2O.dat","/Users/zakk/Desktop/MPn/test.dat",1000000,100.0f,false);
 
 	return 0;
+}
+
+void usage(char *argv0)
+{
+	printf("Usage: %s <inifile> [<otherinifiles> ...]\n",argv0);
+
+	exit(0);
+}
+
+int main(int argc,char *argv[])
+{
+	if(argc<2)
+		usage(argv[0]);
+
+	bool first=true;
+
+	for(int c=1;c<argc;c++)
+	{
+		struct configuration_t config;
+
+		if(first==true)
+			fprintf(stderr,"Diagrammatic Monte Carlo for Møller-Plesset theory.\n");
+
+		load_config_defaults(&config);
+
+		if(load_configuration(argv[c],&config)==false)
+			continue;
+
+		do_diagmc(&config);
+		first=false;
+
+		if((c+1)!=argc)
+			printf("\n");
+	}
 }
