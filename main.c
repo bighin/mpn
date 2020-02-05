@@ -800,7 +800,7 @@ void run_debug_tests3c(void)
 	printf("%f %f\n",connected,not_connected);
 }
 
-int old_main(void)
+int oldmain(void)
 {
 	//run_debug_tests();
 	//run_debug_tests3();
@@ -809,7 +809,7 @@ int old_main(void)
 	//run_debug_tests5();
 	//run_debug_tests6();
 	//run_debug_tests7();
-	//run_debug_tests3c();
+	run_debug_tests3c();
 	//do_diagmc("/Users/zakk/Desktop/MPn/psi4/H2O.dat","/Users/zakk/Desktop/MPn/test.dat",1000000,100.0f,false);
 
 	return 0;

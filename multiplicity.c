@@ -158,8 +158,7 @@ int adjacency_matrix_multiplicity(gsl_matrix_int *adjacency)
 		}
 	}
 
-	if((adjacency=downsize_matrix(adjacency,targets))==NULL)
-		return 1;
+	adjacency=downsize_matrix(adjacency,targets);
 
 	/*
 		Then we repeatedly create a block, and we delete it, counting the total

@@ -41,6 +41,7 @@ struct amatrix_t *init_amatrix(char *energies_dot_dat)
 
 	ret->bias=0.0f;
 	ret->unphysicalpenalty=1.0f;
+	ret->minorder=1;
 	ret->maxorder=16;
 
 	return ret;
@@ -348,8 +349,6 @@ double amatrix_weight(struct amatrix_t *amx)
 
 		weight+=0.5*get_eri(amx->ectx,a-1,b-1,a-1,b-1);
 		weight+=get_enuc(amx->ectx)*pow(amx->nr_occupied,-2.0f);
-
-#warning Is this correct?
 
 		multiplicity=1.0f;
 
