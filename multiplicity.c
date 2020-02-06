@@ -4,6 +4,10 @@
 #include "multiplicity.h"
 #include "auxx.h"
 
+/*
+	I follow the algorithmic determination of multiplicity by Quoc
+*/
+
 bool create_one_by_swapping_cols(gsl_matrix_int *adjacency, size_t indexi, size_t indexj)
 {
 	for(size_t j=indexj;j<adjacency->size2;j++)

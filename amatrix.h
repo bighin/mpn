@@ -43,7 +43,7 @@ struct amatrix_t
 	int minorder,maxorder;
 };
 
-struct amatrix_t *init_amatrix(char *energies_dot_dat);
+struct amatrix_t *init_amatrix(const char *energies_dot_dat);
 void fini_amatrix(struct amatrix_t *amx);
 
 int amatrix_get_entry(struct amatrix_t *amx, int i, int j);

@@ -2,7 +2,6 @@
 #include <stdbool.h>
 #include <math.h>
 #include <assert.h>
-#include <stdarg.h>
 
 #include "amatrix.h"
 #include "mpn.h"

@@ -1,3 +1,14 @@
+/*
+	Note that this file is almost entirely C, we compile it (and we compile the
+	whole project) as C++ since here we want to use the ALEA library from ALPSCore.
+*/
+
+#include <alps/alea.hpp>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <math.h>
 #include <assert.h>
 #include <sys/time.h>
@@ -27,42 +38,44 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	amatrix_save(amx, &backup);
 
 	int dimensions=amx->pmxs[0]->dimensions;
-	int i,j;
+	int i, j;
 
 	switch(pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i, &j))
 	{
 		case 1:
-		probability*=((dimensions+1)*amx->nr_virtual*amx->nr_occupied);
-		probability/=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_occupied):(amx->nr_virtual);
-		break;
+			probability*=((dimensions+1)*amx->nr_virtual*amx->nr_occupied);
+			probability/=(pmatrix_entry_type(i, j)==QTYPE_OCCUPIED) ? (amx->nr_occupied)
+										: (amx->nr_virtual);
+			break;
 
 		case 2:
-		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
-		probability*=((dimensions+1)*amx->nr_occupied);
-		break;
+			assert(pmatrix_entry_type(dimensions, dimensions)==QTYPE_OCCUPIED);
+			probability*=((dimensions+1)*amx->nr_occupied);
+			break;
 
 		case -1:
 		default:
-		assert(false);
-		return UPDATE_ERROR;
+			assert(false);
+			return UPDATE_ERROR;
 	}
 
 	switch(pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i, &j))
 	{
 		case 1:
-		probability*=((dimensions+1)*amx->nr_virtual*amx->nr_occupied);
-		probability/=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED) ? (amx->nr_occupied) : (amx->nr_virtual);
-		break;
+			probability*=((dimensions+1)*amx->nr_virtual*amx->nr_occupied);
+			probability/=(pmatrix_entry_type(i, j)==QTYPE_OCCUPIED) ? (amx->nr_occupied)
+										: (amx->nr_virtual);
+			break;
 
 		case 2:
-		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
-		probability*=((dimensions+1)*amx->nr_occupied);
-		break;
+			assert(pmatrix_entry_type(dimensions, dimensions)==QTYPE_OCCUPIED);
+			probability*=((dimensions+1)*amx->nr_occupied);
+			break;
 
 		case -1:
 		default:
-		assert(false);
-		return UPDATE_ERROR;
+			assert(false);
+			return UPDATE_ERROR;
 	}
 
 	/*
@@ -97,42 +110,44 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	amatrix_save(amx, &backup);
 
 	int dimensions=amx->pmxs[0]->dimensions;
-	int i,j;
+	int i, j;
 
 	switch(pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx, &i, &j))
 	{
 		case 1:
-		probability/=(dimensions*amx->nr_virtual*amx->nr_occupied);
-		probability*=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_occupied):(amx->nr_virtual);
-		break;
+			probability/=(dimensions*amx->nr_virtual*amx->nr_occupied);
+			probability*=(pmatrix_entry_type(i, j)==QTYPE_OCCUPIED) ? (amx->nr_occupied)
+										: (amx->nr_virtual);
+			break;
 
 		case 2:
-		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
-		probability/=(dimensions*amx->nr_occupied);
-		break;
+			assert(pmatrix_entry_type(dimensions, dimensions)==QTYPE_OCCUPIED);
+			probability/=(dimensions*amx->nr_occupied);
+			break;
 
 		case -1:
 		default:
-		assert(false);
-		return UPDATE_ERROR;
+			assert(false);
+			return UPDATE_ERROR;
 	}
 
 	switch(pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx, &i, &j))
 	{
 		case 1:
-		probability/=(dimensions*amx->nr_virtual*amx->nr_occupied);
-		probability*=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED) ? (amx->nr_occupied) : (amx->nr_virtual);
-		break;
+			probability/=(dimensions*amx->nr_virtual*amx->nr_occupied);
+			probability*=(pmatrix_entry_type(i, j)==QTYPE_OCCUPIED) ? (amx->nr_occupied)
+										: (amx->nr_virtual);
+			break;
 
 		case 2:
-		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
-		probability/=(dimensions*amx->nr_occupied);
-		break;
+			assert(pmatrix_entry_type(dimensions, dimensions)==QTYPE_OCCUPIED);
+			probability/=(dimensions*amx->nr_occupied);
+			break;
 
 		case -1:
 		default:
-		assert(false);
-		return UPDATE_ERROR;
+			assert(false);
+			return UPDATE_ERROR;
 	}
 
 	double acceptance_ratio;
@@ -140,7 +155,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	weightratio*=amatrix_weight(amx);
 	acceptance_ratio=fabs(weightratio)*probability;
 
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
@@ -195,17 +210,17 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 		Are we swapping rows or columns?
 	*/
 
-	int update[2],reverse[2];
+	int update[2], reverse[2];
 
 	switch(gsl_rng_uniform_int(amx->rng_ctx, 2))
 	{
 		case 0:
-		pmatrix_swap_rows(target, i, j, update, reverse, amx->rng_ctx);
-		break;
+			pmatrix_swap_rows(target, i, j, update, reverse, amx->rng_ctx);
+			break;
 
 		case 1:
-		pmatrix_swap_cols(target, i, j, update, reverse, amx->rng_ctx);
-		break;
+			pmatrix_swap_cols(target, i, j, update, reverse, amx->rng_ctx);
+			break;
 	}
 
 	double acceptance_ratio;
@@ -217,7 +232,7 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	acceptance_ratio/=pow(amx->nr_occupied, reverse[QTYPE_OCCUPIED]);
 	acceptance_ratio/=pow(amx->nr_virtual, reverse[QTYPE_VIRTUAL]);
 
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
@@ -270,7 +285,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	weightratio*=amatrix_weight(amx);
 	acceptance_ratio=fabs(weightratio);
 
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
@@ -285,9 +300,9 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	Auxiliary functions
 */
 
-void show_update_statistics(FILE *out,int proposed,int accepted,int rejected)
+void show_update_statistics(FILE *out, int proposed, int accepted, int rejected)
 {
-	double accepted_pct,rejected_pct;
+	double accepted_pct, rejected_pct;
 
 	if(proposed>0)
 	{
@@ -299,7 +314,8 @@ void show_update_statistics(FILE *out,int proposed,int accepted,int rejected)
 		accepted_pct=rejected_pct=0.0f;
 	}
 
-	fprintf(out,"proposed %d, accepted %d (%f%%), rejected %d (%f%%).\n",proposed,accepted,accepted_pct,rejected,rejected_pct);
+	fprintf(out, "proposed %d, accepted %d (%f%%), rejected %d (%f%%).\n", proposed, accepted, accepted_pct,
+		rejected, rejected_pct);
 }
 
 static volatile int keep_running=1;
@@ -309,6 +325,10 @@ void interrupt_handler(int dummy __attribute__((unused)))
 	keep_running=0;
 }
 
+#ifdef __cplusplus
+}
+#endif
+
 /*
 	The actual DiagMC routine.
 */
@@ -316,12 +336,12 @@ void interrupt_handler(int dummy __attribute__((unused)))
 int do_diagmc(struct configuration_t *config)
 {
 
-#define DIAGRAM_NR_UPDATES	(4)
+#define DIAGRAM_NR_UPDATES        (4)
 
-	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx,bool always_accept);
-	char *update_names[DIAGRAM_NR_UPDATES];
+	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx, bool always_accept);
+	const char *update_names[DIAGRAM_NR_UPDATES];
 
-	int proposed[DIAGRAM_NR_UPDATES],accepted[DIAGRAM_NR_UPDATES],rejected[DIAGRAM_NR_UPDATES];
+	int proposed[DIAGRAM_NR_UPDATES], accepted[DIAGRAM_NR_UPDATES], rejected[DIAGRAM_NR_UPDATES];
 
 	/*
 		We set up the updates we will be using
@@ -348,8 +368,8 @@ int do_diagmc(struct configuration_t *config)
 		We initialize the variables we will use for sampling.
 	*/
 
-	int positive[256],negative[256];
-	int nr_samples,nr_samples_including_unphysical;
+	int positive[256], negative[256];
+	int nr_samples, nr_samples_including_unphysical;
 
 	nr_samples=nr_samples_including_unphysical=0;
 
@@ -362,21 +382,21 @@ int do_diagmc(struct configuration_t *config)
 		We print some informative message, and then we open the log file
 	*/
 
-	fprintf(stderr,"Performing %d iterations\n",config->iterations);
+	fprintf(stderr, "Performing %d iterations\n", config->iterations);
 
 	FILE *out;
 	char output[1024];
 
-	snprintf(output,1024,"%s.dat",config->prefix);
+	snprintf(output, 1024, "%s.dat", config->prefix);
 	output[1023]='\0';
 
-	if(!(out=fopen(output,"w+")))
+	if(!(out=fopen(output, "w+")))
 	{
-		fprintf(stderr,"Error: couldn't open %s for writing\n",output);
+		fprintf(stderr, "Error: couldn't open %s for writing\n", output);
 		return 0;
 	}
 
-	fprintf(stderr,"Writing results to '%s'\n",output);
+	fprintf(stderr, "Writing results to '%s'\n", output);
 
 	/*
 		The diagram parameters are loaded from the configuration, as a new 'amatrix' is created
@@ -394,12 +414,12 @@ int do_diagmc(struct configuration_t *config)
 	*/
 
 	keep_running=1;
-	signal(SIGINT,interrupt_handler);
+	signal(SIGINT, interrupt_handler);
 
 	progressbar *progress;
 
 	if(config->progressbar==true)
-		progress=progressbar_new("Progress",config->iterations/16384);
+		progress=progressbar_new("Progress", config->iterations/16384);
 	else
 		progress=NULL;
 
@@ -408,7 +428,7 @@ int do_diagmc(struct configuration_t *config)
 	*/
 
 	struct timeval starttime;
-	gettimeofday(&starttime,NULL);
+	gettimeofday(&starttime, NULL);
 
 	/*
 		This is the main DiagMC loop
@@ -417,7 +437,7 @@ int do_diagmc(struct configuration_t *config)
 	int counter;
 	for(counter=0;(counter<config->iterations)&&(keep_running==1);counter++)
 	{
-		int update_type,status;
+		int update_type, status;
 
 		update_type=gsl_rng_uniform_int(amx->rng_ctx, DIAGRAM_NR_UPDATES);
 		status=updates[update_type](amx, false);
@@ -426,24 +446,24 @@ int do_diagmc(struct configuration_t *config)
 		switch(status)
 		{
 			case UPDATE_ACCEPTED:
-			accepted[update_type]++;
-			break;
+				accepted[update_type]++;
+				break;
 
-			/*
-				FIXME:
+				/*
+					FIXME:
 
-				Here unphysical and rejected updates are treated in exactly the same way.
-				Is this OK?
-			*/
+					Here unphysical and rejected updates are treated in exactly the same way.
+					Is this OK?
+				*/
 
 			case UPDATE_UNPHYSICAL:
 			case UPDATE_REJECTED:
-			rejected[update_type]++;
-			break;
+				rejected[update_type]++;
+				break;
 
 			case UPDATE_ERROR:
 			default:
-			assert(false);
+				assert(false);
 		}
 
 		nr_samples_including_unphysical++;
@@ -476,7 +496,7 @@ int do_diagmc(struct configuration_t *config)
 			if(config->progressbar==true)
 				progressbar_inc(progress);
 
-			gettimeofday(&now,NULL);
+			gettimeofday(&now, NULL);
 
 			elapsedtime=(now.tv_sec-starttime.tv_sec)*1000.0;
 			elapsedtime+=(now.tv_usec-starttime.tv_usec)/1000.0;
@@ -501,22 +521,23 @@ int do_diagmc(struct configuration_t *config)
 		Now we print the statistics we collected to the output file in a nice way.
 	*/
 
-	fprintf(out,"# Diagrammatic Monte Carlo for Møller-Plesset theory\n");
-	fprintf(out,"#\n");
-	fprintf(out,"# Electron repulsion integrals loaded from '%s'\n",config->erisfile);
-	fprintf(out,"# Output file is '%s'\n",output);
-	fprintf(out,"#\n");
-	fprintf(out,"# Bias: %f\n",config->bias);
-	fprintf(out,"# Unphysical penalty: %f\n",config->unphysicalpenalty);
-	fprintf(out,"# Minimum order: %d\n",config->minorder);
-	fprintf(out,"# Maximum order: %d\n",config->maxorder);
-	fprintf(out,"#\n");
+	fprintf(out, "# Diagrammatic Monte Carlo for Møller-Plesset theory\n");
+	fprintf(out, "#\n");
+	fprintf(out, "# Electron repulsion integrals loaded from '%s'\n", config->erisfile);
+	fprintf(out, "# Output file is '%s'\n", output);
+	fprintf(out, "#\n");
+	fprintf(out, "# Bias: %f\n", config->bias);
+	fprintf(out, "# Unphysical penalty: %f\n", config->unphysicalpenalty);
+	fprintf(out, "# Minimum order: %d\n", config->minorder);
+	fprintf(out, "# Maximum order: %d\n", config->maxorder);
+	fprintf(out, "#\n");
 
-	fprintf(out,"# Iterations (actual/planned): %d/%d\n",counter,config->iterations);
-	fprintf(out,"# Thermalization: %d\n",config->thermalization);
-	fprintf(out,"# Decorrelation: %d\n",config->decorrelation);
-	fprintf(out,"# Iterations in the physical sector: %f%%\n",100.0f*((double)(nr_samples))/((double)(nr_samples_including_unphysical)));
-	fprintf(out,"#\n");
+	fprintf(out, "# Iterations (actual/planned): %d/%d\n", counter, config->iterations);
+	fprintf(out, "# Thermalization: %d\n", config->thermalization);
+	fprintf(out, "# Decorrelation: %d\n", config->decorrelation);
+	fprintf(out, "# Iterations in the physical sector: %f%%\n",
+		100.0f*((double)(nr_samples))/((double)(nr_samples_including_unphysical)));
+	fprintf(out, "#\n");
 
 	/*
 		Here we calculate the elapsed time.
@@ -525,45 +546,45 @@ int do_diagmc(struct configuration_t *config)
 	struct timeval now;
 	double elapsedtime;
 
-	gettimeofday(&now,NULL);
+	gettimeofday(&now, NULL);
 
 	elapsedtime=(now.tv_sec-starttime.tv_sec)*1000.0;
 	elapsedtime+=(now.tv_usec-starttime.tv_usec)/1000.0;
 	elapsedtime/=1000;
 
-	fprintf(out,"# Total time: %f seconds\n",elapsedtime);
-	fprintf(out,"#\n");
+	fprintf(out, "# Total time: %f seconds\n", elapsedtime);
+	fprintf(out, "#\n");
 
 	/*
 		Now we print some update statistics
 	*/
 
-	int total_proposed,total_accepted,total_rejected;
+	int total_proposed, total_accepted, total_rejected;
 	total_proposed=total_accepted=total_rejected=0;
 
-	fprintf(out,"# Update statistics:\n");
+	fprintf(out, "# Update statistics:\n");
 
 	for(int d=0;d<DIAGRAM_NR_UPDATES;d++)
 	{
-		fprintf(out,"# Update #%d (%s): ",d,update_names[d]);
-		show_update_statistics(out,proposed[d],accepted[d],rejected[d]);
+		fprintf(out, "# Update #%d (%s): ", d, update_names[d]);
+		show_update_statistics(out, proposed[d], accepted[d], rejected[d]);
 
 		total_proposed+=proposed[d];
 		total_accepted+=accepted[d];
 		total_rejected+=rejected[d];
 	}
 
-	fprintf(out,"# Total: ");
-	show_update_statistics(out,total_proposed,total_accepted,total_rejected);
-	fprintf(out,"#\n");
+	fprintf(out, "# Total: ");
+	show_update_statistics(out, total_proposed, total_accepted, total_rejected);
+	fprintf(out, "#\n");
 
 	/*
 		Finally, we output the actual results.
 	*/
 
-	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign>\n");
+	fprintf(out, "# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign>\n");
 
-	int total_positive,total_negative;
+	int total_positive, total_negative;
 
 	total_positive=total_negative=0;
 	for(int order=amx->minorder;order<=amx->maxorder;order++)
@@ -574,7 +595,7 @@ int do_diagmc(struct configuration_t *config)
 
 	for(int order=amx->minorder;order<=amx->maxorder;order++)
 	{
-		double pct,sign;
+		double pct, sign;
 
 		if((total_positive-total_negative)!=0)
 			pct=100.0f*((double)(positive[order]-negative[order]))/(total_positive-total_negative);
@@ -586,7 +607,7 @@ int do_diagmc(struct configuration_t *config)
 		else
 			sign=NAN;
 
-		fprintf(out, "%d %d %d %f %f\n",order,positive[order],negative[order],pct,sign);
+		fprintf(out, "%d %d %d %f %f\n", order, positive[order], negative[order], pct, sign);
 	}
 
 	if(out)

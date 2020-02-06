@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.6)
-project(mpn C)
+project(mpn C CXX)
 
 # Get the current git working branch
 execute_process(
@@ -10,15 +10,15 @@ execute_process(
 
 add_definitions("-DGITCOMMIT=\"${COMMIT}\"")
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_C_FLAGS "-Wall -Wextra -Wshadow -Wpedantic")
-set(CMAKE_C_FLAGS_DEBUG "-g")
-set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wshadow -Wpedantic")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 find_package(GSL REQUIRED)
 include_directories(${GSL_INCLUDE_DIR})
@@ -26,8 +26,13 @@ include_directories(${GSL_INCLUDE_DIR})
 find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
 
-add_executable(mpn mpn.c mpn.h amatrix.c amatrix.h auxx.c auxx.h pmatrix.c pmatrix.h loaderis.c loaderis.h mc.c mc.h libprogressbar/progressbar.c libprogressbar/progressbar.h inih/ini.c inih/ini.h main.c config.c config.h multiplicity.c multiplicity.h)
+set(ALPS_FORCE_NO_COMPILER_CHECK "1")
+find_package(ALPSCore REQUIRED)
+include_directories(${ALPSCore_INCLUDE_DIR})
+
+add_executable(mpn mpn.c mpn.h amatrix.c amatrix.h auxx.c auxx.h pmatrix.c pmatrix.h loaderis.c loaderis.h mc.cpp mc.h libprogressbar/progressbar.c libprogressbar/progressbar.h inih/ini.c inih/ini.h main.c config.c config.h multiplicity.c multiplicity.h cache.c cache.h)
 
 target_link_libraries(mpn ${GSL_LIBRARIES})
 target_link_libraries(mpn ${CURSES_LIBRARIES})
 target_link_libraries(mpn m)
+target_link_libraries(mpn ${ALPSCore_LIBRARIES})

@@ -12,7 +12,7 @@
 #include "mpn.h"
 #include "multiplicity.h"
 
-struct amatrix_t *init_amatrix(char *energies_dot_dat)
+struct amatrix_t *init_amatrix(const char *energies_dot_dat)
 {
 	struct amatrix_t *ret=malloc(sizeof(struct amatrix_t));
 
@@ -263,12 +263,6 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 	bool result=true;
 
 	gsl_matrix_int *adjacency=gsl_matrix_int_alloc(dimensions, dimensions);
-	gsl_matrix_int *powers=gsl_matrix_int_alloc(dimensions, dimensions);
-	gsl_matrix_int *tmp=gsl_matrix_int_alloc(dimensions, dimensions);
-	gsl_matrix_int *C=gsl_matrix_int_alloc(dimensions, dimensions);
-
-	gsl_matrix_int_set_zero(C);
-	gsl_matrix_int_set_identity(powers);
 
 	for(int i=0;i<dimensions;i++)
 	{
@@ -285,6 +279,13 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 			gsl_matrix_int_set(adjacency, i, j, value);
 		}
 	}
+
+	gsl_matrix_int *powers=gsl_matrix_int_alloc(dimensions, dimensions);
+	gsl_matrix_int *tmp=gsl_matrix_int_alloc(dimensions, dimensions);
+	gsl_matrix_int *C=gsl_matrix_int_alloc(dimensions, dimensions);
+
+	gsl_matrix_int_set_zero(C);
+	gsl_matrix_int_set_identity(powers);
 
 	for(int power=0;power<=(dimensions-1);power++)
 	{
