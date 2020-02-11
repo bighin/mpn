@@ -5,6 +5,7 @@
 #include <assert.h>
 
 #include "loaderis.h"
+#include "auxx.h"
 
 int eritensor_index(int i, int j, int a, int b, int nocc, int nvirt)
 {
@@ -130,7 +131,9 @@ bool parse_tokens(char tokens[MAX_TOKENS][TOKEN_MAX_LENGTH],int nrtokens,struct 
 				First time, we allocate the tensor
 			*/
 
-			printf("Tensor size: %ld MiB\n",sizeof(double)*eritensor_size(ctx->nocc, ctx->nvirt)/1024/1024);
+			printf("Tensor size: ");
+			print_file_size(stdout,sizeof(double)*eritensor_size(ctx->nocc, ctx->nvirt));
+			printf("\n");
 
 			ctx->eritensor=malloc(sizeof(double)*eritensor_size(ctx->nocc, ctx->nvirt));
 		}

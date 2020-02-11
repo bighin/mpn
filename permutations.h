@@ -1,3 +1,14 @@
+#ifndef __PERMUTATIONS_H__
+#define __PERMUTATIONS_H__
+
+#include <gsl/gsl_matrix.h>
+
+int get_permutation_index(int *permutation,int length);
+gsl_matrix_int *permutation_to_matrix(const int *permutation,int dimensions);
+void matrix_to_permutation(gsl_matrix_int *m,int *permutation);
+
+#ifdef INCLUDE_PERMUTATIONS_LISTS
+
 int permutations2[2][2]={{1,2},{2,1}};
 
 int permutations3[6][3]={{1, 2, 3},{1, 3, 2},{2, 1, 3},{2, 3, 1},{3, 1, 2},{3, 2, 1}};
@@ -857,3 +868,14 @@ int permutations6[720][6]=
 			   {6, 5, 4, 3, 1, 2},
 			   {6, 5, 4, 3, 2, 1}
 };
+#else
+
+extern int permutations2[2][2];
+extern int permutations3[6][3];
+extern int permutations4[24][4];
+extern int permutations5[120][5];
+extern int permutations6[720][6];
+
+#endif //INCLUDE_PERMUTATIONS_LISTS
+
+#endif //__PERMUTATIONS_H__

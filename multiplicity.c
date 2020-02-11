@@ -133,6 +133,7 @@ gsl_matrix_int *downsize_matrix(gsl_matrix_int *adjacency,gsl_matrix_int *target
 		return newmatrix;
 	}
 
+	gsl_matrix_int_free(adjacency);
 	return NULL;
 }
 

@@ -9,8 +9,7 @@ void seed_rng(gsl_rng *rng);
 
 double factorial(int i);
 int ifactorial(int n);
-
-char get_nth_character(char *s,size_t n);
+int ipow(int base,int exp);
 
 void gsl_matrix_int_print(gsl_matrix_int *m);
 void gsl_matrix_int_mul(gsl_matrix_int *A,gsl_matrix_int *B,gsl_matrix_int *C);
@@ -23,6 +22,8 @@ int negative_part(int x);
 #define MIN(x,y)	(((x)<(y))?(x):(y))
 #define MAX(x,y)	(((x)>(y))?(x):(y))
 
-int ipow(int base,int exp);
+char get_nth_character(char *s,size_t n);
+
+void print_file_size(FILE *out,int size);
 
 #endif //__AUXX_H__

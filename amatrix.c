@@ -7,11 +7,11 @@
 
 #include "amatrix.h"
 #include "pmatrix.h"
-#include "auxx.h"
 #include "loaderis.h"
 #include "mpn.h"
 #include "multiplicity.h"
 #include "cache.h"
+#include "auxx.h"
 
 struct amatrix_t *init_amatrix(const char *energies_dot_dat)
 {
@@ -37,6 +37,13 @@ struct amatrix_t *init_amatrix(const char *energies_dot_dat)
 	}
 	else
 	{
+		ret->ectx=NULL;
+
+		/*
+			Here we set some default values. However, if the ERI file is not loaded,
+			the number of occupied/virtual orbitals doesn't make a lot of sense.
+		*/
+
 		ret->nr_occupied=10;
 		ret->nr_virtual=16;
 	}
@@ -144,7 +151,7 @@ void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 }
 
 /*
-	Printing and debug functions
+	Printing an 'amatrix'
 */
 
 void amatrix_print(struct amatrix_t *amx)
@@ -175,6 +182,10 @@ void amatrix_print(struct amatrix_t *amx)
 	fflush(stdout);
 }
 
+/*
+	Basic internal consistency check
+*/
+
 bool amatrix_check_consistency(struct amatrix_t *amx)
 {
 	if((amx->pmxs[0]->dimensions<1)||(amx->pmxs[1]->dimensions<1))
@@ -185,6 +196,13 @@ bool amatrix_check_consistency(struct amatrix_t *amx)
 
 	return pmatrix_check_consistency(amx->pmxs[0])&&pmatrix_check_consistency(amx->pmxs[1]);
 }
+
+/*
+	Check if the matrix belongs to the physical sector.
+
+	Note that an amatrix_t object can be unphysical, but still consistent,
+	as defined by amatrix_check_consistency().
+*/
 
 bool amatrix_is_physical(struct amatrix_t *amx)
 {
@@ -342,7 +360,7 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 {
 	int dimensions=amx->pmxs[0]->dimensions;
 
-	if((dimensions>1)&&(dimensions<=amatrix_cache_max_dimensions)&&(amatrix_cache_is_enabled))
+	if((dimensions>1)&&(dimensions<=amatrix_cache_max_dimensions)&&(amatrix_cache_is_enabled==true))
 	{
 		assert(cached_amatrix_check_connectedness(amx)==actual_amatrix_check_connectedness(amx));
 		return cached_amatrix_check_connectedness(amx);
@@ -378,6 +396,8 @@ double amatrix_weight(struct amatrix_t *amx)
 	/*
 		Dimension 1 is a special case that does not need the evaluation
 		of the incidence matrix.
+
+		Note that dimension 1 corresponds to the Hartree-Fock energy.
 	*/
 
 	if(amx->pmxs[0]->dimensions==1)
@@ -409,6 +429,8 @@ double amatrix_weight(struct amatrix_t *amx)
 	double weight,multiplicity;
 
 	weight=incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysicalpenalty, false);
+	gsl_matrix_int_free(incidence);
+
 	multiplicity=amatrix_multiplicity(amx);
 
 	amx->cached_weight=amx->bias+weight/multiplicity;

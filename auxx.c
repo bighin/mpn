@@ -41,7 +41,6 @@ double factorial(int i)
 	Factorial of an integer, using only integer arithmetic
 */
 
-
 int ifactorial(int n)
 {
 	int result = 1;
@@ -52,12 +51,27 @@ int ifactorial(int n)
 	return result;
 }
 
-char get_nth_character(char *s,size_t n)
-{
-	if(n<strlen(s))
-		return s[n];
+/*
+	Power operation using integer arithmetic
+*/
 
-	return '_';
+int ipow(int base,int exp)
+{
+	int result=1;
+
+	for (;;)
+	{
+		if (exp&1)
+			result *= base;
+		exp>>=1;
+
+		if (!exp)
+			break;
+
+		base*=base;
+	}
+
+	return result;
 }
 
 /*
@@ -163,6 +177,10 @@ bool columns_are_identical(gsl_matrix_int *m, size_t col1, size_t col2)
 	return true;
 }
 
+/*
+	Positive and negative part of an integer number
+*/
+
 int positive_part(int x)
 {
 	return (x>0)?(x):(0);
@@ -173,21 +191,36 @@ int negative_part(int x)
 	return (x<0)?(-x):(0);
 }
 
-int ipow(int base,int exp)
+/*
+	Returns the n-th character of the string s if it is long enough, otherwise an underscore.
+*/
+
+char get_nth_character(char *s,size_t n)
 {
-	int result=1;
+	if(n<strlen(s))
+		return s[n];
 
-	for (;;)
+	return '_';
+}
+
+/*
+	Print a file size using the appropriate units.
+*/
+
+void print_file_size(FILE *out,int size)
+{
+	char *symbols[]={"B","KiB","MiB","GiB","TiB","PiB"};
+
+	for(int c=0;c<6;c++)
 	{
-		if (exp&1)
-			result *= base;
-		exp>>=1;
+		if(size<1024)
+		{
+			fprintf(out,"%d %s", size, symbols[c]);
+			return;
+		}
 
-		if (!exp)
-			break;
-
-		base*=base;
+		size/=1024;
 	}
 
-	return result;
+	fprintf(out,"%d %s", size, "EiB");
 }
