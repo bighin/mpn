@@ -3,6 +3,7 @@
 
 #include "amatrix.h"
 
+double actual_amatrix_multiplicity(struct amatrix_t *amx);
 double amatrix_multiplicity(struct amatrix_t *amx);
 
 #endif //__MULTIPLICITY_H__

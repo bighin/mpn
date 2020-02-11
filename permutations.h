@@ -1,3 +1,5 @@
+int permutations2[2][2]={{1,2},{2,1}};
+
 int permutations3[6][3]={{1, 2, 3},{1, 3, 2},{2, 1, 3},{2, 3, 1},{3, 1, 2},{3, 2, 1}};
 
 int permutations4[24][4]=

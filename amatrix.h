@@ -41,6 +41,13 @@ struct amatrix_t
 
 	double bias,unphysicalpenalty;
 	int minorder,maxorder;
+
+	/*
+		The cached weight
+	*/
+
+	double cached_weight;
+	bool cached_weight_is_valid;
 };
 
 struct amatrix_t *init_amatrix(const char *energies_dot_dat);
@@ -54,6 +61,9 @@ struct amatrix_backup_t
 {
 	int dimensions[2];
 	int values[2][IMATRIX_MAX_DIMENSIONS][IMATRIX_MAX_DIMENSIONS];
+
+	double cached_weight;
+	bool cached_weight_is_valid;
 };
 
 void amatrix_save(struct amatrix_t *amx, struct amatrix_backup_t *backup);
@@ -65,6 +75,7 @@ bool amatrix_is_physical(struct amatrix_t *amx);
 void amatrix_to_python(struct amatrix_t *amx);
 void amatrix_to_wolfram(struct amatrix_t *amx);
 
+bool actual_amatrix_check_connectedness(struct amatrix_t *amx);
 bool amatrix_check_connectedness(struct amatrix_t *amx);
 double amatrix_weight(struct amatrix_t *amx);
 

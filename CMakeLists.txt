@@ -34,5 +34,5 @@ add_executable(mpn mpn.c mpn.h amatrix.c amatrix.h auxx.c auxx.h pmatrix.c pmatr
 
 target_link_libraries(mpn ${GSL_LIBRARIES})
 target_link_libraries(mpn ${CURSES_LIBRARIES})
-target_link_libraries(mpn m)
 target_link_libraries(mpn ${ALPSCore_LIBRARIES})
+target_link_libraries(mpn m)

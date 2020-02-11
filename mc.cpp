@@ -76,6 +76,8 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 		return UPDATE_ERROR;
 	}
 
+	amx->cached_weight_is_valid=false;
+
 	/*
 		Finally we calculate the acceptance ratio for the update.
 	*/
@@ -145,6 +147,8 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 		assert(false);
 		return UPDATE_ERROR;
 	}
+
+	amx->cached_weight_is_valid=false;
 
 	double acceptance_ratio;
 
@@ -219,6 +223,8 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 		break;
 	}
 
+	amx->cached_weight_is_valid=false;
+
 	double acceptance_ratio;
 
 	weightratio*=amatrix_weight(amx);
@@ -270,6 +276,8 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 			if(pmatrix_get_entry(target, i, j)!=0)
 				pmatrix_set_entry(target, i, j, pmatrix_get_new_value(target, amx->rng_ctx, i, j));
 	}
+
+	amx->cached_weight_is_valid=false;
 
 	/*
 		The update is balanced with itself, the acceptance ratio is simply given
@@ -360,18 +368,21 @@ int do_diagmc(struct configuration_t *config)
 		proposed[d]=accepted[d]=rejected[d]=0;
 
 	/*
-		We initialize the variables we will use for sampling.
+		We initialize the accumulators and variables we will use for performing measurements.
 	*/
 
-	int positive[256],negative[256];
-	int nr_samples,nr_samples_including_unphysical;
+	assert(config->maxorder>config->minorder);
+	assert(config->maxorder<256);
 
-	nr_samples=nr_samples_including_unphysical=0;
+	alps::alea::autocorr_acc<double> autocorrelation(1);
+	alps::alea::batch_acc<double> signs[256];
+
+	int nr_samples,nr_physical_samples,nr_samples_by_order[256],nr_positive_samples[256],nr_negative_samples[256];
+
+	nr_samples=nr_physical_samples=0;
 
 	for(int c=0;c<256;c++)
-		positive[c]=negative[c]=0;
-
-	assert(config->maxorder<256);
+		nr_samples_by_order[c]=nr_positive_samples[c]=nr_negative_samples[c]=0;
 
 	/*
 		We print some informative message, and then we open the log file
@@ -461,13 +472,13 @@ int do_diagmc(struct configuration_t *config)
 			assert(false);
 		}
 
-		nr_samples_including_unphysical++;
+		nr_samples++;
 
 		if(amatrix_is_physical(amx))
 		{
-			nr_samples++;
+			nr_physical_samples++;
 
-			if((counter>config->thermalization)&&((nr_samples%config->decorrelation)==0))
+			if((counter>config->thermalization)&&((nr_physical_samples%config->decorrelation)==0))
 			{
 				/*
 					TODO: one can get the weight for free since it has already been calculated!
@@ -475,11 +486,18 @@ int do_diagmc(struct configuration_t *config)
 				*/
 
 				double weight=amatrix_weight(amx);
+				double sign=(weight>0.0f)?(1.0f):(-1.0f);
+				int order=amx->pmxs[0]->dimensions;
 
-				if(weight>0.0f)
-					positive[amx->pmxs[0]->dimensions]++;
+				autocorrelation << weight;
+				signs[order] << sign;
+
+				nr_samples_by_order[order]++;
+
+				if(weight>=0.0)
+					nr_positive_samples[order]++;
 				else
-					negative[amx->pmxs[0]->dimensions]++;
+					nr_negative_samples[order]++;
 			}
 		}
 
@@ -510,8 +528,6 @@ int do_diagmc(struct configuration_t *config)
 	if(config->progressbar)
 		progressbar_finish(progress);
 
-	fini_amatrix(amx);
-
 	/*
 		Now we print the statistics we collected to the output file in a nice way.
 	*/
@@ -530,7 +546,7 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Iterations (actual/planned): %d/%d\n",counter,config->iterations);
 	fprintf(out,"# Thermalization: %d\n",config->thermalization);
 	fprintf(out,"# Decorrelation: %d\n",config->decorrelation);
-	fprintf(out,"# Iterations in the physical sector: %f%%\n",100.0f*((double)(nr_samples))/((double)(nr_samples_including_unphysical)));
+	fprintf(out,"# Iterations in the physical sector: %f%%\n",100.0f*((double)(nr_physical_samples))/((double)(nr_samples)));
 	fprintf(out,"#\n");
 
 	/*
@@ -576,15 +592,21 @@ int do_diagmc(struct configuration_t *config)
 		Finally, we output the actual results.
 	*/
 
-	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign>\n");
+	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Sign (from ALEA)>\n");
+
+	alps::alea::autocorr_result<double> result_autocorrelation=autocorrelation.finalize();
+	alps::alea::batch_result<double> result_signs[256];
+
+	for(int c=0;c<256;c++)
+		result_signs[c]=signs[c].finalize();
 
 	int total_positive,total_negative;
 
 	total_positive=total_negative=0;
 	for(int order=amx->minorder;order<=amx->maxorder;order++)
 	{
-		total_positive+=positive[order];
-		total_negative+=negative[order];
+		total_positive+=nr_positive_samples[order];
+		total_negative+=nr_negative_samples[order];
 	}
 
 	for(int order=amx->minorder;order<=amx->maxorder;order++)
@@ -592,17 +614,43 @@ int do_diagmc(struct configuration_t *config)
 		double pct,sign;
 
 		if((total_positive-total_negative)!=0)
-			pct=100.0f*((double)(positive[order]-negative[order]))/(total_positive-total_negative);
+			pct=100.0f*((double)(nr_positive_samples[order]-nr_negative_samples[order]))/(total_positive-total_negative);
 		else
 			pct=NAN;
 
-		if((positive[order]+negative[order])!=0)
-			sign=((double)(positive[order]-negative[order]))/((double)(positive[order]+negative[order]));
+		if((nr_positive_samples[order]+nr_negative_samples[order])!=0)
+			sign=((double)(nr_positive_samples[order]-nr_negative_samples[order]))/((double)(nr_positive_samples[order]+nr_negative_samples[order]));
 		else
 			sign=NAN;
 
-		fprintf(out, "%d %d %d %f %f\n",order,positive[order],negative[order],pct,sign);
+		fprintf(out, "%d %d %d %f %f ", order, nr_positive_samples[order], nr_negative_samples[order], pct, sign);
+
+		/*
+			Remember that result_signs[order].mean() has type alps::alea::column
+			which is a shorthand for Eigen::column
+		*/
+
+		fprintf(out, "%f+-%f\n",result_signs[order].mean()(0),sqrt(result_signs[order].stderror()(0)));
 	}
+
+	fprintf(out,"Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
+
+	//auto divide = [] (double x,double y) -> double { return x/y; };
+	//auto joined_data=alps::alea::join(result_signs[1],result_signs[2]);
+	//auto transformer=alps::alea::make_transformer(std::function<double(double,double)>(divide));
+	//auto ratio=alps::alea::transform(alps::alea::jackknife_prop(),transformer,joined_data);
+
+	/*
+		From the tutorial (https://github.com/ALPSCore/ALPSCore/wiki/Tutorial:-ALEA):
+
+		Functions of multiple random variables (X,Y) can be realized by grouping the arguments
+		together using alps::alea::join and then applying the transform on the combined result.
+	*/
+
+	//fprintf(out,"\nRatio is: %f\n",ratio.mean()(0));
+	//std::cout << ratio.mean() << std::endl;
+
+	fini_amatrix(amx);
 
 	if(out)
 		fclose(out);

@@ -8,6 +8,7 @@
 void seed_rng(gsl_rng *rng);
 
 double factorial(int i);
+int ifactorial(int n);
 
 char get_nth_character(char *s,size_t n);
 
@@ -21,5 +22,7 @@ int negative_part(int x);
 
 #define MIN(x,y)	(((x)<(y))?(x):(y))
 #define MAX(x,y)	(((x)>(y))?(x):(y))
+
+int ipow(int base,int exp);
 
 #endif //__AUXX_H__

@@ -8,6 +8,7 @@
 #include "mc.h"
 #include "multiplicity.h"
 #include "config.h"
+#include "cache.h"
 
 void run_debug_tests(void)
 {
@@ -21,6 +22,7 @@ void run_debug_tests(void)
 	for(int c=0;c<5;c++)
 	{
 		update_extend(amx, true);
+		amx->cached_weight_is_valid=false;
 
 		amatrix_print(amx);
 		printf("Weight: %f\n\n",amatrix_weight(amx));
@@ -31,6 +33,8 @@ void run_debug_tests(void)
 	for(int c=0;c<1000000;c++)
 	{
 		update_shuffle(amx, true);
+		amx->cached_weight_is_valid=false;
+
 		printf("%f\n",amatrix_weight(amx));
 		assert(amatrix_check_consistency(amx)==true);
 	}
@@ -38,6 +42,7 @@ void run_debug_tests(void)
 	for(int c=0;c<1000000;c++)
 	{
 		update_shuffle(amx, true);
+		amx->cached_weight_is_valid=false;
 
 		if(amatrix_is_physical(amx)==true)
 		{
@@ -64,6 +69,8 @@ void run_debug_tests(void)
 	for(int c=0;c<5;c++)
 	{
 		update_squeeze(amx, true);
+		amx->cached_weight_is_valid=false;
+
 		amatrix_print(amx);
 		printf("\n");
 
@@ -181,27 +188,20 @@ void run_debug_tests2(void)
 }
 
 /*
-	Here we debug the connectedness test
-*/
+	Here we debug the connectedness test.
 
-gsl_matrix_int *permutation_to_matrix(int *permutation,int dimensions)
-{
-	gsl_matrix_int *ret=gsl_matrix_int_alloc(dimensions,dimensions);
-
-	for(int i=0;i<dimensions;i++)
-		for(int j=0;j<dimensions;j++)
-			gsl_matrix_int_set(ret,i,j,((permutation[i]-1)==j)?(1):(0));
-
-	return ret;
-}
-
-#include "permutations.h"
-
-/*
-	Here we check the number of connected diagrams at order 3,4,5,6 and compare
+	We check the number of connected diagrams at order 3,4,5,6 and compare
 	them with values obtained from Wolfram Mathematica, please see the notebook
 	Connectedness.nb
+
+	The following variables are defined cache.c (via permutations.h).
 */
+
+extern int permutations2[2][2];
+extern int permutations3[6][3];
+extern int permutations4[24][4];
+extern int permutations5[120][5];
+extern int permutations6[720][6];
 
 void run_debug_tests3(void)
 {
@@ -833,7 +833,10 @@ int main(int argc,char *argv[])
 		struct configuration_t config;
 
 		if(first==true)
-			fprintf(stderr,"Diagrammatic Monte Carlo for Møller-Plesset theory.\n");
+		{
+			fprintf(stderr, "Diagrammatic Monte Carlo for Møller-Plesset theory.\n");
+			init_cache(6);
+		}
 
 		load_config_defaults(&config);
 

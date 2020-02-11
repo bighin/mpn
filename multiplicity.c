@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <assert.h>
 
 #include "multiplicity.h"
 #include "auxx.h"
+#include "cache.h"
 
 /*
 	I follow the algorithmic determination of multiplicity by Quoc
@@ -217,7 +219,7 @@ int adjacency_matrix_multiplicity(gsl_matrix_int *adjacency)
 	return 1<<nrblocks;
 }
 
-double amatrix_multiplicity(struct amatrix_t *amx)
+double actual_amatrix_multiplicity(struct amatrix_t *amx)
 {
 	int dimensions=amx->pmxs[0]->dimensions;
 
@@ -253,4 +255,17 @@ double amatrix_multiplicity(struct amatrix_t *amx)
 	*/
 
 	return adjacency_matrix_multiplicity(adjacency);
+}
+
+double amatrix_multiplicity(struct amatrix_t *amx)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	if((dimensions>1)&&(dimensions<=amatrix_cache_max_dimensions)&&(amatrix_cache_is_enabled==true))
+	{
+		assert(cached_amatrix_multiplicity(amx)==actual_amatrix_multiplicity(amx));
+		return cached_amatrix_multiplicity(amx);
+	}
+
+	return actual_amatrix_multiplicity(amx);
 }

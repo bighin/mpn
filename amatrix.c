@@ -11,6 +11,7 @@
 #include "loaderis.h"
 #include "mpn.h"
 #include "multiplicity.h"
+#include "cache.h"
 
 struct amatrix_t *init_amatrix(const char *energies_dot_dat)
 {
@@ -18,19 +19,27 @@ struct amatrix_t *init_amatrix(const char *energies_dot_dat)
 
 	assert(ret!=NULL);
 
-	FILE *in=fopen(energies_dot_dat,"r");
+	if(energies_dot_dat!=NULL)
+	{
+		FILE *in=fopen(energies_dot_dat, "r");
 
-	if(!in)
-		return NULL;
+		if(!in)
+			return NULL;
 
-	ret->ectx=malloc(sizeof(struct energies_ctx_t));
-	assert(ret->ectx!=NULL);
-	load_energies(in, ret->ectx);
+		ret->ectx=malloc(sizeof(struct energies_ctx_t));
+		assert(ret->ectx!=NULL);
+		load_energies(in, ret->ectx);
 
-	fclose(in);
+		fclose(in);
 
-	ret->nr_occupied=ret->ectx->nocc;
-	ret->nr_virtual=ret->ectx->nvirt;
+		ret->nr_occupied=ret->ectx->nocc;
+		ret->nr_virtual=ret->ectx->nvirt;
+	}
+	else
+	{
+		ret->nr_occupied=10;
+		ret->nr_virtual=16;
+	}
 
 	ret->rng_ctx=gsl_rng_alloc(gsl_rng_mt19937);
 	assert(ret->rng_ctx!=NULL);
@@ -43,6 +52,9 @@ struct amatrix_t *init_amatrix(const char *energies_dot_dat)
 	ret->unphysicalpenalty=1.0f;
 	ret->minorder=1;
 	ret->maxorder=16;
+
+	ret->cached_weight=0.0f;
+	ret->cached_weight_is_valid=false;
 
 	return ret;
 }
@@ -105,6 +117,9 @@ void amatrix_save(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 			backup->values[1][i][j]=amx->pmxs[1]->values[i][j];
 		}
 	}
+
+	backup->cached_weight=amx->cached_weight;
+	backup->cached_weight_is_valid=amx->cached_weight_is_valid;
 }
 
 void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
@@ -123,6 +138,9 @@ void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 			amx->pmxs[1]->values[i][j]=backup->values[1][i][j];
 		}
 	}
+
+	amx->cached_weight=backup->cached_weight;
+	amx->cached_weight_is_valid=backup->cached_weight_is_valid;
 }
 
 /*
@@ -252,7 +270,7 @@ void amatrix_to_wolfram(struct amatrix_t *amx)
 	printf("}\n");
 }
 
-bool amatrix_check_connectedness(struct amatrix_t *amx)
+bool actual_amatrix_check_connectedness(struct amatrix_t *amx)
 {
 	int dimensions=amx->pmxs[0]->dimensions;
 
@@ -320,6 +338,19 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 	return result;
 }
 
+bool amatrix_check_connectedness(struct amatrix_t *amx)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	if((dimensions>1)&&(dimensions<=amatrix_cache_max_dimensions)&&(amatrix_cache_is_enabled))
+	{
+		assert(cached_amatrix_check_connectedness(amx)==actual_amatrix_check_connectedness(amx));
+		return cached_amatrix_check_connectedness(amx);
+	}
+
+	return actual_amatrix_check_connectedness(amx);
+}
+
 /*
 	Here we calculate the weight associated to a 'amatrix'
 */
@@ -328,6 +359,18 @@ double amatrix_weight(struct amatrix_t *amx)
 {
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions>=1);
+
+	if(amx->cached_weight_is_valid==true)
+	{
+
+#ifndef NDEBUG
+		amx->cached_weight_is_valid=false;
+		assert(amx->cached_weight==amatrix_weight(amx));
+		amx->cached_weight_is_valid=true;
+#endif
+
+		return amx->cached_weight;
+	}
 
 	if(amatrix_check_connectedness(amx)==false)
 		return 0.0f;
@@ -353,7 +396,9 @@ double amatrix_weight(struct amatrix_t *amx)
 
 		multiplicity=1.0f;
 
-		return amx->bias+multiplicity*weight;
+		amx->cached_weight=amx->bias+multiplicity*weight;
+		amx->cached_weight_is_valid=true;
+		return amx->bias+weight/multiplicity;
 	}
 
 	struct label_t labels[MAX_LABELS];
@@ -366,5 +411,7 @@ double amatrix_weight(struct amatrix_t *amx)
 	weight=incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysicalpenalty, false);
 	multiplicity=amatrix_multiplicity(amx);
 
+	amx->cached_weight=amx->bias+weight/multiplicity;
+	amx->cached_weight_is_valid=true;
 	return amx->bias+weight/multiplicity;
 }

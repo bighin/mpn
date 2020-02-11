@@ -37,6 +37,21 @@ double factorial(int i)
 	return tgamma(i+1);
 }
 
+/*
+	Factorial of an integer, using only integer arithmetic
+*/
+
+
+int ifactorial(int n)
+{
+	int result = 1;
+
+	for (int i = 1; i <= n; ++i)
+		result *= i;
+
+	return result;
+}
+
 char get_nth_character(char *s,size_t n)
 {
 	if(n<strlen(s))
@@ -156,4 +171,23 @@ int positive_part(int x)
 int negative_part(int x)
 {
 	return (x<0)?(-x):(0);
+}
+
+int ipow(int base,int exp)
+{
+	int result=1;
+
+	for (;;)
+	{
+		if (exp&1)
+			result *= base;
+		exp>>=1;
+
+		if (!exp)
+			break;
+
+		base*=base;
+	}
+
+	return result;
 }
