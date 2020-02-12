@@ -209,6 +209,7 @@ bool init_cache(int max_dimensions)
 		Now we just fill the caches.
 
 		TODO: this could be extended at least to order 8.
+		However, in that case the multiplicity will no longer fit in three bits!
 	*/
 
 	if(max_dimensions>=2) fill_cache(2,3,1);
@@ -236,7 +237,10 @@ uint8_t cache_get_entry(int index, int dimensions)
 	assert(index<cache_largest_index(dimensions));
 
 	/*
-		TODO: if RAM is a problem, each entry could be squeezed in half a byte only.
+		TODO: if RAM is a problem, each entry could be squeezed in half a byte.
+
+		We only have to modify cache_get_entry(), cache_set_entry() and the
+		malloc() call in init_cache().
 	*/
 
 	return amatrix_cache[dimensions][index];
@@ -247,6 +251,11 @@ void cache_set_entry(int index, int dimensions, int multiplicity, bool isconnect
 	assert((dimensions>1)&&(dimensions<=amatrix_cache_max_dimensions));
 	assert(amatrix_cache[dimensions]!=NULL);
 	assert(index<cache_largest_index(dimensions));
+
+	/*
+		With diagrams up to order 6, the multiplicity can take only the values
+		1, 2, 4, 8. We subtract one so that it can fit in three bits.
+	*/
 
 	uint8_t byte=(multiplicity-1)&0x7;
 

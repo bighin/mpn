@@ -480,11 +480,6 @@ int do_diagmc(struct configuration_t *config)
 
 			if((counter>config->thermalization)&&((nr_physical_samples%config->decorrelation)==0))
 			{
-				/*
-					TODO: one can get the weight for free since it has already been calculated!
-					We can just cache the result!
-				*/
-
 				double weight=amatrix_weight(amx);
 				double sign=(weight>0.0f)?(1.0f):(-1.0f);
 				int order=amx->pmxs[0]->dimensions;
@@ -543,7 +538,7 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);
 	fprintf(out,"#\n");
 
-	fprintf(out,"# Iterations (actual/planned): %d/%d\n",counter,config->iterations);
+	fprintf(out,"# Iterations (done/planned): %d/%d\n",counter,config->iterations);
 	fprintf(out,"# Thermalization: %d\n",config->thermalization);
 	fprintf(out,"# Decorrelation: %d\n",config->decorrelation);
 	fprintf(out,"# Iterations in the physical sector: %f%%\n",100.0f*((double)(nr_physical_samples))/((double)(nr_samples)));
