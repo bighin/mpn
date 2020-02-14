@@ -413,7 +413,7 @@ int do_diagmc(struct configuration_t *config)
 
 	if(!amx)
 	{
-		fprintf(stderr,"Error: couldn't load the ERIs file.\n",output);
+		fprintf(stderr,"Error: couldn't load the ERIs file (%s).\n",config->erisfile);
 		return 0;
 	}
 
