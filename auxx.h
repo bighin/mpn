@@ -26,4 +26,6 @@ char get_nth_character(char *s,size_t n);
 
 void print_file_size(FILE *out,int size);
 
+char *find_and_replace(const char *src,const char *from,const char *to);
+
 #endif //__AUXX_H__

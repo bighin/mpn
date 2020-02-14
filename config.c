@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "config.h"
+#include "auxx.h"
 #include "inih/ini.h"
 
 int configuration_handler(void *user,const char *section,const char *name,const char *value)
@@ -12,7 +13,20 @@ int configuration_handler(void *user,const char *section,const char *name,const 
 
 	if(MATCH("general","prefix"))
 	{
-		pconfig->prefix=strdup(value);
+		if(strcmp(value,"auto")==0)
+		{
+			if(!strstr(pconfig->inipath,".ini"))
+			{
+				printf("Error: using automatic prefix, but the configuration file path does not contain '.ini'\n");
+				exit(0);
+			}
+
+			pconfig->prefix=find_and_replace(pconfig->inipath,".ini","");
+		}
+		else
+		{
+			pconfig->prefix=strdup(value);
+		}
 	}
 	else if(MATCH("general","progressbar"))
 	{
@@ -84,20 +98,19 @@ void load_config_defaults(struct configuration_t *config)
 	config->timelimit=0.0f;
 	config->decorrelation=10;
 
-	config->ininame=NULL;
+	config->inipath=NULL;
 }
 
 bool load_configuration(char *configfile,struct configuration_t *config)
 {
 	load_config_defaults(config);
+	config->inipath=strdup(configfile);
 
 	if(ini_parse(configfile,configuration_handler,config)<0)
 	{
 		fprintf(stderr,"Couldn't read or parse '%s'\n",configfile);
 		return false;
 	}
-
-	config->ininame=strdup(configfile);
 
 	fprintf(stderr,"Loaded '%s'\n",configfile);
 	return true;

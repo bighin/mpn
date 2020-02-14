@@ -26,7 +26,7 @@ struct configuration_t
 
 	/* The name of the file the configuration has been loaded from */
 
-	char *ininame;
+	char *inipath;
 };
 
 int configuration_handler(void *user,const char *section,const char *name,const char *value);
