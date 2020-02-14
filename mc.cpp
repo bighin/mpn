@@ -12,6 +12,7 @@ extern "C" {
 #include <math.h>
 #include <assert.h>
 #include <sys/time.h>
+#include <signal.h>
 #include <gsl/gsl_rng.h>
 
 #include "mc.h"
@@ -344,7 +345,7 @@ int do_diagmc(struct configuration_t *config)
 	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx,bool always_accept);
 	const char *update_names[DIAGRAM_NR_UPDATES];
 
-	int proposed[DIAGRAM_NR_UPDATES],accepted[DIAGRAM_NR_UPDATES],rejected[DIAGRAM_NR_UPDATES];
+	long int proposed[DIAGRAM_NR_UPDATES],accepted[DIAGRAM_NR_UPDATES],rejected[DIAGRAM_NR_UPDATES];
 
 	/*
 		We set up the updates we will be using
@@ -377,7 +378,7 @@ int do_diagmc(struct configuration_t *config)
 	alps::alea::autocorr_acc<double> autocorrelation(1);
 	alps::alea::batch_acc<double> signs[256];
 
-	int nr_samples,nr_physical_samples,nr_samples_by_order[256],nr_positive_samples[256],nr_negative_samples[256];
+	long int nr_samples,nr_physical_samples,nr_samples_by_order[256],nr_positive_samples[256],nr_negative_samples[256];
 
 	nr_samples=nr_physical_samples=0;
 
@@ -388,7 +389,7 @@ int do_diagmc(struct configuration_t *config)
 		We print some informative message, and then we open the log file
 	*/
 
-	fprintf(stderr,"Performing %d iterations\n",config->iterations);
+	fprintf(stderr,"Performing %ld iterations\n",config->iterations);
 
 	FILE *out;
 	char output[1024];
@@ -410,6 +411,12 @@ int do_diagmc(struct configuration_t *config)
 
 	struct amatrix_t *amx=init_amatrix(config->erisfile);
 
+	if(!amx)
+	{
+		fprintf(stderr,"Error: couldn't load the ERIs file.\n",output);
+		return 0;
+	}
+
 	amx->bias=config->bias;
 	amx->unphysicalpenalty=config->unphysicalpenalty;
 	amx->minorder=config->minorder;
@@ -425,7 +432,7 @@ int do_diagmc(struct configuration_t *config)
 	progressbar *progress;
 
 	if(config->progressbar==true)
-		progress=progressbar_new("Progress",config->iterations/16384);
+		progress=progressbar_new("Progress",config->iterations/262144);
 	else
 		progress=NULL;
 
@@ -440,7 +447,7 @@ int do_diagmc(struct configuration_t *config)
 		This is the main DiagMC loop
 	*/
 
-	int counter;
+	long int counter;
 	for(counter=0;(counter<config->iterations)&&(keep_running==1);counter++)
 	{
 		int update_type,status;
@@ -496,7 +503,7 @@ int do_diagmc(struct configuration_t *config)
 			}
 		}
 
-		if((counter%16384)==0)
+		if((counter%262144)==0)
 		{
 			struct timeval now;
 			double elapsedtime;
@@ -538,7 +545,7 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);
 	fprintf(out,"#\n");
 
-	fprintf(out,"# Iterations (done/planned): %d/%d\n",counter,config->iterations);
+	fprintf(out,"# Iterations (done/planned): %ld/%ld\n",counter,config->iterations);
 	fprintf(out,"# Thermalization: %d\n",config->thermalization);
 	fprintf(out,"# Decorrelation: %d\n",config->decorrelation);
 	fprintf(out,"# Iterations in the physical sector: %f%%\n",100.0f*((double)(nr_physical_samples))/((double)(nr_samples)));
@@ -564,7 +571,7 @@ int do_diagmc(struct configuration_t *config)
 		Now we print some update statistics
 	*/
 
-	int total_proposed,total_accepted,total_rejected;
+	long int total_proposed,total_accepted,total_rejected;
 	total_proposed=total_accepted=total_rejected=0;
 
 	fprintf(out,"# Update statistics:\n");
@@ -595,7 +602,7 @@ int do_diagmc(struct configuration_t *config)
 	for(int c=0;c<256;c++)
 		result_signs[c]=signs[c].finalize();
 
-	int total_positive,total_negative;
+	long int total_positive,total_negative;
 
 	total_positive=total_negative=0;
 	for(int order=amx->minorder;order<=amx->maxorder;order++)
@@ -618,17 +625,17 @@ int do_diagmc(struct configuration_t *config)
 		else
 			sign=NAN;
 
-		fprintf(out, "%d %d %d %f %f ", order, nr_positive_samples[order], nr_negative_samples[order], pct, sign);
+		fprintf(out, "%d %ld %ld %f %f ", order, nr_positive_samples[order], nr_negative_samples[order], pct, sign);
 
 		/*
 			Remember that result_signs[order].mean() has type alps::alea::column
 			which is a shorthand for Eigen::column
 		*/
 
-		fprintf(out, "%f+-%f\n",result_signs[order].mean()(0),sqrt(result_signs[order].stderror()(0)));
+		fprintf(out, "%f+-%f\n",result_signs[order].mean()(0),result_signs[order].stderror()(0));
 	}
 
-	fprintf(out,"Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
+	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
 
 	//auto divide = [] (double x,double y) -> double { return x/y; };
 	//auto joined_data=alps::alea::join(result_signs[1],result_signs[2]);

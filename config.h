@@ -19,7 +19,7 @@ struct configuration_t
 
 	/* "sampling" section */
 
-	int iterations;
+	long int iterations;
 	int thermalization;
 	double timelimit;
 	int decorrelation;

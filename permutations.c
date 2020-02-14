@@ -1,8 +1,8 @@
 #include <gsl/gsl_matrix.h>
 #include <assert.h>
 
-#define INCLUDE_PERMUTATIONS_LISTS
 #include "permutations.h"
+#include "plist.h"
 
 /*
 	Given a N-permutation of number from 1 to N, returns its index in the lexicographic

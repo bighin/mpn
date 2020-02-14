@@ -45,7 +45,7 @@ int configuration_handler(void *user,const char *section,const char *name,const 
 	}
 	else if(MATCH("sampling","iterations"))
 	{
-		pconfig->iterations=atoi(value);
+		pconfig->iterations=(long int)(strtol(value,(char **)NULL,10));
 	}
 	else if(MATCH("sampling","thermalization"))
 	{
