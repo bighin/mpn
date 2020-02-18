@@ -3,6 +3,10 @@
 
 #include "regularization.h"
 
+/*
+	For a review of various regularization schemes, see arXiv:1807.06185
+*/
+
 double regularize(struct amatrix_t *amx,double denominator)
 {
 	switch(amx->regularization)
