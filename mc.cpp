@@ -1,6 +1,6 @@
 /*
-	Note that this file is almost entirely C, we compile it (and we compile the
-	whole project) as C++ since here we want to use the ALEA library from ALPSCore.
+	Note that this file is almost entirely C, we compile it as C++ since
+	we want to use the ALEA library from ALPSCore.
 */
 
 #include <alps/alea.hpp>
@@ -20,6 +20,7 @@ extern "C" {
 #include "auxx.h"
 #include "mpn.h"
 #include "config.h"
+#include "regularization.h"
 
 #include "libprogressbar/progressbar.h"
 
@@ -305,7 +306,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	Auxiliary functions
 */
 
-void show_update_statistics(FILE *out,int proposed,int accepted,int rejected)
+void show_update_statistics(FILE *out,long int proposed,long int accepted,long int rejected)
 {
 	double accepted_pct,rejected_pct;
 
@@ -319,7 +320,7 @@ void show_update_statistics(FILE *out,int proposed,int accepted,int rejected)
 		accepted_pct=rejected_pct=0.0f;
 	}
 
-	fprintf(out,"proposed %d, accepted %d (%f%%), rejected %d (%f%%).\n",proposed,accepted,accepted_pct,rejected,rejected_pct);
+	fprintf(out,"proposed %ld, accepted %ld (%f%%), rejected %ld (%f%%).\n",proposed,accepted,accepted_pct,rejected,rejected_pct);
 }
 
 static volatile int keep_running=1;
@@ -421,6 +422,12 @@ int do_diagmc(struct configuration_t *config)
 	amx->unphysicalpenalty=config->unphysicalpenalty;
 	amx->minorder=config->minorder;
 	amx->maxorder=config->maxorder;
+	amx->regularization=config->regularization;
+	amx->alpha=config->alpha;
+	amx->sigma=config->sigma;
+	amx->p=config->p;
+	amx->resummation=config->resummation;
+	amx->epsilon=config->epsilon;
 
 	/*
 		We setup an interrupt handler to gracefully handle a CTRL-C.
@@ -545,8 +552,14 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);
 	fprintf(out,"#\n");
 
+	fprintf(out,"# Regularization type: %s\n",regularization_type_description(config->regularization));
+	fprintf(out,"# Regularization parameters (alpha, sigma, p): (%f, %f, %f)\n",config->alpha,config->sigma,config->p);
+	fprintf(out,"# Resummation type: %s\n",resummation_type_description(config->resummation));
+	fprintf(out,"# Resummation epsilon: %f\n",config->epsilon);
+	fprintf(out,"#\n");
+
 	fprintf(out,"# Iterations (done/planned): %ld/%ld\n",counter,config->iterations);
-	fprintf(out,"# Thermalization: %d\n",config->thermalization);
+	fprintf(out,"# Thermalization: %ld\n",config->thermalization);
 	fprintf(out,"# Decorrelation: %d\n",config->decorrelation);
 	fprintf(out,"# Iterations in the physical sector: %f%%\n",100.0f*((double)(nr_physical_samples))/((double)(nr_samples)));
 	fprintf(out,"#\n");

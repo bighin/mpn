@@ -428,7 +428,7 @@ double amatrix_weight(struct amatrix_t *amx)
 
 	double weight,multiplicity;
 
-	weight=incidence_to_weight(incidence, labels, &ilabels, amx->ectx, amx->unphysicalpenalty, false);
+	weight=incidence_to_weight(incidence, labels, &ilabels, amx);
 	gsl_matrix_int_free(incidence);
 
 	multiplicity=amatrix_multiplicity(amx);

@@ -17,10 +17,27 @@ struct configuration_t
 	double unphysicalpenalty;
 	int minorder,maxorder;
 
+	/*
+		"regularization" section
+	*/
+
+#define REGULARIZATION_TYPE_NONE	(21)
+#define REGULARIZATION_TYPE_ALPHA	(22)
+#define REGULARIZATION_TYPE_SIGMA	(23)
+
+	int regularization;
+	double alpha,sigma,p;
+
+#define RESUMMATION_TYPE_NONE		(31)
+#define RESUMMATION_TYPE_LINDELOEF	(32)
+
+	int resummation;
+	double epsilon;
+
 	/* "sampling" section */
 
 	long int iterations;
-	int thermalization;
+	long int thermalization;
 	double timelimit;
 	int decorrelation;
 

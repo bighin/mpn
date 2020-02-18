@@ -6,6 +6,7 @@
 
 #include "pmatrix.h"
 #include "loaderis.h"
+#include "config.h"
 
 /*
 	The 'amatrix' struct: a matrix following a certain set of rules,
@@ -41,6 +42,10 @@ struct amatrix_t
 
 	double bias,unphysicalpenalty;
 	int minorder,maxorder;
+	int regularization;
+	double alpha,sigma,p;
+	int resummation;
+	double epsilon;
 
 	/*
 		The cached weight

@@ -57,13 +57,49 @@ int configuration_handler(void *user,const char *section,const char *name,const 
 	{
 		pconfig->maxorder=atof(value);
 	}
+	else if(MATCH("regularization","regularization"))
+	{
+		if(!strcmp(value,"none"))
+			pconfig->regularization=REGULARIZATION_TYPE_NONE;
+		else if(!strcmp(value,"alpha"))
+			pconfig->regularization=REGULARIZATION_TYPE_ALPHA;
+		else if(!strcmp(value,"sigma"))
+			pconfig->regularization=REGULARIZATION_TYPE_SIGMA;
+		else
+			return 0;
+	}
+	else if(MATCH("regularization","alpha"))
+	{
+		pconfig->alpha=atof(value);
+	}
+	else if(MATCH("regularization","sigma"))
+	{
+		pconfig->sigma=atof(value);
+	}
+	else if(MATCH("regularization","p"))
+	{
+		pconfig->p=atof(value);
+	}
+	else if(MATCH("regularization","resummation"))
+	{
+		if(!strcmp(value,"none"))
+			pconfig->resummation=RESUMMATION_TYPE_NONE;
+		else if(!strcmp(value,"lindeloef"))
+			pconfig->resummation=RESUMMATION_TYPE_LINDELOEF;
+		else
+			return 0;
+	}
+	else if(MATCH("regularization","epsilon"))
+	{
+		pconfig->epsilon=atof(value);
+	}
 	else if(MATCH("sampling","iterations"))
 	{
 		pconfig->iterations=(long int)(strtol(value,(char **)NULL,10));
 	}
 	else if(MATCH("sampling","thermalization"))
 	{
-		pconfig->thermalization=atoi(value);
+		pconfig->thermalization=(long int)(strtol(value,(char **)NULL,10));
 	}
 	else if(MATCH("sampling","timelimit"))
 	{
@@ -92,6 +128,13 @@ void load_config_defaults(struct configuration_t *config)
 	config->unphysicalpenalty=0.01f;
 	config->minorder=1;
 	config->minorder=16;
+
+	config->regularization=REGULARIZATION_TYPE_NONE;
+	config->alpha=0.0f;
+	config->sigma=0.0f;
+	config->p=1.0f;
+	config->resummation=RESUMMATION_TYPE_NONE;
+	config->epsilon=0.0f;
 
 	config->iterations=10000000;
 	config->thermalization=config->iterations/100;

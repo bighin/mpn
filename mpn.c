@@ -9,6 +9,7 @@
 #include "pmatrix.h"
 #include "auxx.h"
 #include "loaderis.h"
+#include "regularization.h"
 
 /*
 	For this function and the next one, see Szabo-Ostlund, page 360.
@@ -78,24 +79,12 @@ int count_loops(struct label_t *labels, int *ilabels, int mels[MAX_MATRIX_ELEMEN
 	This function calculates a diagram's weight given the incidence matrix
 */
 
-double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct energies_ctx_t *ectx,double unphysical_penalty,bool verbose)
+double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx)
 {
 	int mels[MAX_MATRIX_ELEMENTS][4];
 	assert(B->size1<=MAX_MATRIX_ELEMENTS);
 
 	double inversefactor=1.0f;
-
-	if(verbose==true)
-	{
-		printf("Labels: ");
-
-		for(int i=0;i<*ilabels;i++)
-			printf("%c (%d) ", labels[i].mnemonic, labels[i].value);
-
-		printf("\n");
-
-		gsl_matrix_int_print(B);
-	}
 
 	/*
 		Rule 2: each row in the incidence matrix corresponds to a matrix element.
@@ -163,9 +152,6 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 
 	for(size_t i=0;i<(B->size1-1);i++)
 	{
-		if(verbose==true)
-			printf("{");
-
 		double denominator=0.0f;
 		int energies_in_denominator=0;
 
@@ -182,18 +168,15 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 					The j-th label contributes to the i-th denominator
 				*/
 
-				if(verbose==true)
-					printf("%c",labels[j].mnemonic);
-
 				switch(labels[j].qtype)
 				{
 					case QTYPE_OCCUPIED:
-					denominator+=get_occupied_energy(ectx,labels[j].value-1);
+					denominator+=get_occupied_energy(amx->ectx,labels[j].value-1);
 					energies_in_denominator++;
 					break;
 
 					case QTYPE_VIRTUAL:
-					denominator-=get_virtual_energy(ectx,labels[j].value-1);
+					denominator-=get_virtual_energy(amx->ectx,labels[j].value-1);
 					energies_in_denominator++;
 					break;
 
@@ -204,10 +187,7 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 		}
 
 		if(energies_in_denominator>0)
-			denominators*=denominator;
-
-		if(verbose==true)
-			printf("}\n");
+			denominators*=regularize(amx,denominator);
 	}
 
 	/*
@@ -225,18 +205,13 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 
 	inversefactor*=pow(-1.0f,l+h);
 
-	if(verbose==true)
-		printf("H: %d, L: %d\n",h,l);
-
 	/*
 		Finally print out all of this, in a computer-readable form, while also
 		calculating the total weight.
 	*/
 
-	if(verbose==true)
-		printf("1/%f\n",inversefactor);
-
 	double numerators=1.0f;
+	int nr_numerators=0;
 
 	for(size_t i=0;i<B->size1;i++)
 	{
@@ -254,17 +229,9 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 				graph connecting a vertex with itself, appearing only in the unphysical sector.
 			*/
 
-			numerators*=unphysical_penalty;
+			numerators*=amx->unphysicalpenalty;
 
 			continue;
-		}
-
-		if(verbose==true)
-		{
-			printf("<%c", labels[mels[i][0]].mnemonic);
-			printf("%c|H|", labels[mels[i][1]].mnemonic);
-			printf("%c", labels[mels[i][2]].mnemonic);
-			printf("%c>\n", labels[mels[i][3]].mnemonic);
 		}
 
 		/*
@@ -273,18 +240,23 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 
 		int i1,i2,i3,i4;
 
-		i1=labels[mels[i][0]].value-1+((labels[mels[i][0]].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
-		i2=labels[mels[i][1]].value-1+((labels[mels[i][1]].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
-		i3=labels[mels[i][2]].value-1+((labels[mels[i][2]].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
-		i4=labels[mels[i][3]].value-1+((labels[mels[i][3]].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+		i1=labels[mels[i][0]].value-1+((labels[mels[i][0]].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
+		i2=labels[mels[i][1]].value-1+((labels[mels[i][1]].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
+		i3=labels[mels[i][2]].value-1+((labels[mels[i][2]].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
+		i4=labels[mels[i][3]].value-1+((labels[mels[i][3]].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
 
-		numerators*=get_eri(ectx, i1, i2, i3, i4);
+		numerators*=get_eri(amx->ectx, i1, i2, i3, i4);
+		nr_numerators++;
 	}
 
-	if(verbose==true)
-		printf("Final weight: %f\n",pow(inversefactor,-1.0f)*numerators/denominators);
+	double resummation_factor=1.0f;
 
-	return pow(inversefactor,-1.0f)*numerators/denominators;
+	assert(nr_numerators>=2);
+
+	if(amx->resummation==RESUMMATION_TYPE_LINDELOEF)
+		resummation_factor=exp(-amx->epsilon*nr_numerators*log(nr_numerators));
+
+	return pow(inversefactor,-1.0f)*numerators/denominators*resummation_factor;
 }
 
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels)
@@ -452,7 +424,7 @@ gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_
 
 	/*
 		Now that we have created the incidence matrix, we can verify that it satisfies some
-		properties. This checks are not performed when compiling in 'Release' mode.
+		properties. These checks are not performed when compiling in 'Release' mode.
 	*/
 
 #ifndef NDEBUG
