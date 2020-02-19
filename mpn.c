@@ -283,10 +283,12 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 		numerators*=get_eri(amx->ectx, i1, i2, i3, i4);
 	}
 
-	if(verbose==true)
-		printf("Final weight: %f\n",pow(inversefactor,-1.0f)*numerators/denominators);
+	double lindeloef_factor=exp(amx->config->epsilon*(l+h)*log(l+h));
 
-	return pow(inversefactor,-1.0f)*numerators/denominators;
+	if(verbose==true)
+		printf("Final weight: %f\n",pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor);
+
+	return pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor;
 }
 
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels)

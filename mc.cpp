@@ -538,6 +538,7 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Unphysical penalty: %f\n",config->unphysicalpenalty);
 	fprintf(out,"# Minimum order: %d\n",config->minorder);
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);
+	fprintf(out,"# Epsilon (for Lindelöf resummation): %f\n",config->epsilon);
 	fprintf(out,"#\n");
 
 	fprintf(out,"# Iterations (done/planned): %ld/%ld\n",counter,config->iterations);
