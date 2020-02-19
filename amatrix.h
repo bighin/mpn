@@ -42,10 +42,6 @@ struct amatrix_t
 
 	double bias,unphysicalpenalty;
 	int minorder,maxorder;
-	int regularization;
-	double alpha,sigma,p;
-	int resummation;
-	double epsilon;
 
 	/*
 		The cached weight

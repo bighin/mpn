@@ -20,7 +20,6 @@ extern "C" {
 #include "auxx.h"
 #include "mpn.h"
 #include "config.h"
-#include "regularization.h"
 
 #include "libprogressbar/progressbar.h"
 
@@ -422,12 +421,6 @@ int do_diagmc(struct configuration_t *config)
 	amx->unphysicalpenalty=config->unphysicalpenalty;
 	amx->minorder=config->minorder;
 	amx->maxorder=config->maxorder;
-	amx->regularization=config->regularization;
-	amx->alpha=config->alpha;
-	amx->sigma=config->sigma;
-	amx->p=config->p;
-	amx->resummation=config->resummation;
-	amx->epsilon=config->epsilon;
 
 	/*
 		We setup an interrupt handler to gracefully handle a CTRL-C.
@@ -550,12 +543,6 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Unphysical penalty: %f\n",config->unphysicalpenalty);
 	fprintf(out,"# Minimum order: %d\n",config->minorder);
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);
-	fprintf(out,"#\n");
-
-	fprintf(out,"# Regularization type: %s\n",regularization_type_description(config->regularization));
-	fprintf(out,"# Regularization parameters (alpha, sigma, p): (%f, %f, %f)\n",config->alpha,config->sigma,config->p);
-	fprintf(out,"# Resummation type: %s\n",resummation_type_description(config->resummation));
-	fprintf(out,"# Resummation epsilon: %f\n",config->epsilon);
 	fprintf(out,"#\n");
 
 	fprintf(out,"# Iterations (done/planned): %ld/%ld\n",counter,config->iterations);

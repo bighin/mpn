@@ -9,7 +9,6 @@
 #include "pmatrix.h"
 #include "auxx.h"
 #include "loaderis.h"
-#include "regularization.h"
 
 /*
 	For this function and the next one, see Szabo-Ostlund, page 360.
@@ -81,10 +80,24 @@ int count_loops(struct label_t *labels, int *ilabels, int mels[MAX_MATRIX_ELEMEN
 
 double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx)
 {
+	bool verbose=false;
+
 	int mels[MAX_MATRIX_ELEMENTS][4];
 	assert(B->size1<=MAX_MATRIX_ELEMENTS);
 
 	double inversefactor=1.0f;
+
+	if(verbose==true)
+	{
+		printf("Labels: ");
+
+		for(int i=0;i<*ilabels;i++)
+			printf("%c (%d) ", labels[i].mnemonic, labels[i].value);
+
+		printf("\n");
+
+		gsl_matrix_int_print(B);
+	}
 
 	/*
 		Rule 2: each row in the incidence matrix corresponds to a matrix element.
@@ -152,6 +165,9 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 
 	for(size_t i=0;i<(B->size1-1);i++)
 	{
+		if(verbose==true)
+			printf("{");
+
 		double denominator=0.0f;
 		int energies_in_denominator=0;
 
@@ -168,26 +184,32 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 					The j-th label contributes to the i-th denominator
 				*/
 
+				if(verbose==true)
+					printf("%c",labels[j].mnemonic);
+
 				switch(labels[j].qtype)
 				{
 					case QTYPE_OCCUPIED:
-					denominator+=get_occupied_energy(amx->ectx,labels[j].value-1);
-					energies_in_denominator++;
-					break;
+						denominator+=get_occupied_energy(amx->ectx,labels[j].value-1);
+						energies_in_denominator++;
+						break;
 
 					case QTYPE_VIRTUAL:
-					denominator-=get_virtual_energy(amx->ectx,labels[j].value-1);
-					energies_in_denominator++;
-					break;
+						denominator-=get_virtual_energy(amx->ectx,labels[j].value-1);
+						energies_in_denominator++;
+						break;
 
 					default:
-					assert(false);
+						assert(false);
 				}
 			}
 		}
 
 		if(energies_in_denominator>0)
-			denominators*=regularize(amx,denominator);
+			denominators*=denominator;
+
+		if(verbose==true)
+			printf("}\n");
 	}
 
 	/*
@@ -205,13 +227,18 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 
 	inversefactor*=pow(-1.0f,l+h);
 
+	if(verbose==true)
+		printf("H: %d, L: %d\n",h,l);
+
 	/*
 		Finally print out all of this, in a computer-readable form, while also
 		calculating the total weight.
 	*/
 
+	if(verbose==true)
+		printf("1/%f\n",inversefactor);
+
 	double numerators=1.0f;
-	int nr_numerators=0;
 
 	for(size_t i=0;i<B->size1;i++)
 	{
@@ -234,6 +261,14 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 			continue;
 		}
 
+		if(verbose==true)
+		{
+			printf("<%c", labels[mels[i][0]].mnemonic);
+			printf("%c|H|", labels[mels[i][1]].mnemonic);
+			printf("%c", labels[mels[i][2]].mnemonic);
+			printf("%c>\n", labels[mels[i][3]].mnemonic);
+		}
+
 		/*
 			We have to convert the quantum numbers into the format used by get_eri()
 		*/
@@ -246,17 +281,12 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 		i4=labels[mels[i][3]].value-1+((labels[mels[i][3]].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
 
 		numerators*=get_eri(amx->ectx, i1, i2, i3, i4);
-		nr_numerators++;
 	}
 
-	double resummation_factor=1.0f;
+	if(verbose==true)
+		printf("Final weight: %f\n",pow(inversefactor,-1.0f)*numerators/denominators);
 
-	assert(nr_numerators>=2);
-
-	if(amx->resummation==RESUMMATION_TYPE_LINDELOEF)
-		resummation_factor=exp(-amx->epsilon*nr_numerators*log(nr_numerators));
-
-	return pow(inversefactor,-1.0f)*numerators/denominators*resummation_factor;
+	return pow(inversefactor,-1.0f)*numerators/denominators;
 }
 
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels)
