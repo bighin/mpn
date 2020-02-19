@@ -32,7 +32,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	double weightratio=1.0f/amatrix_weight(amx);
 	double probability=1.0f;
 
-	if(amx->pmxs[0]->dimensions>=amx->maxorder)
+	if(amx->pmxs[0]->dimensions>=amx->config->maxorder)
 		return UPDATE_UNPHYSICAL;
 
 	struct amatrix_backup_t backup;
@@ -104,7 +104,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	double weightratio=1.0f/amatrix_weight(amx);
 	double probability=1.0f;
 
-	if(amx->pmxs[0]->dimensions<=amx->minorder)
+	if(amx->pmxs[0]->dimensions<=amx->config->minorder)
 		return UPDATE_UNPHYSICAL;
 
 	struct amatrix_backup_t backup;
@@ -409,18 +409,13 @@ int do_diagmc(struct configuration_t *config)
 		The diagram parameters are loaded from the configuration, as a new 'amatrix' is created
 	*/
 
-	struct amatrix_t *amx=init_amatrix(config->erisfile);
+	struct amatrix_t *amx;
 
-	if(!amx)
+	if(!(amx=init_amatrix(config)))
 	{
 		fprintf(stderr,"Error: couldn't load the ERIs file (%s).\n",config->erisfile);
 		return 0;
 	}
-
-	amx->bias=config->bias;
-	amx->unphysicalpenalty=config->unphysicalpenalty;
-	amx->minorder=config->minorder;
-	amx->maxorder=config->maxorder;
 
 	/*
 		We setup an interrupt handler to gracefully handle a CTRL-C.
@@ -605,13 +600,13 @@ int do_diagmc(struct configuration_t *config)
 	long int total_positive,total_negative;
 
 	total_positive=total_negative=0;
-	for(int order=amx->minorder;order<=amx->maxorder;order++)
+	for(int order=amx->config->minorder;order<=amx->config->maxorder;order++)
 	{
 		total_positive+=nr_positive_samples[order];
 		total_negative+=nr_negative_samples[order];
 	}
 
-	for(int order=amx->minorder;order<=amx->maxorder;order++)
+	for(int order=amx->config->minorder;order<=amx->config->maxorder;order++)
 	{
 		double pct,sign;
 

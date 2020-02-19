@@ -256,7 +256,7 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 				graph connecting a vertex with itself, appearing only in the unphysical sector.
 			*/
 
-			numerators*=amx->unphysicalpenalty;
+			numerators*=amx->config->unphysicalpenalty;
 
 			continue;
 		}

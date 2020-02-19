@@ -13,15 +13,15 @@
 #include "cache.h"
 #include "auxx.h"
 
-struct amatrix_t *init_amatrix(const char *energies_dot_dat)
+struct amatrix_t *init_amatrix(struct configuration_t *config)
 {
 	struct amatrix_t *ret=malloc(sizeof(struct amatrix_t));
 
 	assert(ret!=NULL);
 
-	if(energies_dot_dat!=NULL)
+	if((config!=NULL)&&(config->erisfile!=NULL))
 	{
-		FILE *in=fopen(energies_dot_dat, "r");
+		FILE *in=fopen(config->erisfile, "r");
 
 		if(!in)
 			return NULL;
@@ -55,10 +55,7 @@ struct amatrix_t *init_amatrix(const char *energies_dot_dat)
 	ret->pmxs[0]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);
 	ret->pmxs[1]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);
 
-	ret->bias=0.0f;
-	ret->unphysicalpenalty=1.0f;
-	ret->minorder=1;
-	ret->maxorder=16;
+	ret->config=config;
 
 	ret->cached_weight=0.0f;
 	ret->cached_weight_is_valid=false;
@@ -416,9 +413,9 @@ double amatrix_weight(struct amatrix_t *amx)
 
 		multiplicity=1.0f;
 
-		amx->cached_weight=amx->bias+multiplicity*weight;
+		amx->cached_weight=amx->config->bias+multiplicity*weight;
 		amx->cached_weight_is_valid=true;
-		return amx->bias+weight/multiplicity;
+		return amx->config->bias+weight/multiplicity;
 	}
 
 	struct label_t labels[MAX_LABELS];
@@ -433,7 +430,7 @@ double amatrix_weight(struct amatrix_t *amx)
 
 	multiplicity=amatrix_multiplicity(amx);
 
-	amx->cached_weight=amx->bias+weight/multiplicity;
+	amx->cached_weight=amx->config->bias+weight/multiplicity;
 	amx->cached_weight_is_valid=true;
-	return amx->bias+weight/multiplicity;
+	return amx->config->bias+weight/multiplicity;
 }

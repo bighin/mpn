@@ -37,11 +37,10 @@ struct amatrix_t
 	struct energies_ctx_t *ectx;
 
 	/*
-		Various parameters
+		Various parameters that are read from the configuration file are store here
 	*/
 
-	double bias,unphysicalpenalty;
-	int minorder,maxorder;
+	struct configuration_t *config;
 
 	/*
 		The cached weight
@@ -51,7 +50,7 @@ struct amatrix_t
 	bool cached_weight_is_valid;
 };
 
-struct amatrix_t *init_amatrix(const char *energies_dot_dat);
+struct amatrix_t *init_amatrix(struct configuration_t *config);
 void fini_amatrix(struct amatrix_t *amx);
 
 int amatrix_get_entry(struct amatrix_t *amx, int i, int j);

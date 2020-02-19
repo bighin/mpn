@@ -86,7 +86,7 @@ void load_config_defaults(struct configuration_t *config)
 {
 	config->prefix=strdup("default");
 	config->progressbar=false;
-	config->erisfile=strdup("H2O.dat");
+	config->erisfile=NULL;
 
 	config->bias=0.0f;
 	config->unphysicalpenalty=0.01f;
