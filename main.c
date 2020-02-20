@@ -28,7 +28,7 @@ int main(int argc,char *argv[])
 
 		if(first==true)
 		{
-			fprintf(stderr, "Diagrammatic Monte Carlo for Møller-Plesset theory.\n");
+			printf("Diagrammatic Monte Carlo for Møller-Plesset theory.\n");
 
 			amatrix_cache_is_enabled=true;
 			init_cache(6);

@@ -117,6 +117,6 @@ bool load_configuration(char *configfile,struct configuration_t *config)
 		return false;
 	}
 
-	fprintf(stderr,"Loaded '%s'\n",configfile);
+	printf("Loaded '%s'\n",configfile);
 	return true;
 }

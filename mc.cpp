@@ -389,7 +389,7 @@ int do_diagmc(struct configuration_t *config)
 		We print some informative message, and then we open the log file
 	*/
 
-	fprintf(stderr,"Performing %ld iterations\n",config->iterations);
+	printf("Performing %ld iterations\n",config->iterations);
 
 	FILE *out;
 	char output[1024];
@@ -403,7 +403,7 @@ int do_diagmc(struct configuration_t *config)
 		return 0;
 	}
 
-	fprintf(stderr,"Writing results to '%s'\n",output);
+	printf("Writing results to '%s'\n",output);
 
 	/*
 		The diagram parameters are loaded from the configuration, as a new 'amatrix' is created
