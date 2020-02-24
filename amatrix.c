@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 
 #include <gsl/gsl_matrix_int.h>
@@ -57,7 +58,9 @@ struct amatrix_t *init_amatrix(struct configuration_t *config)
 
 	ret->config=config;
 
-	ret->cached_weight=0.0f;
+	ret->cached_weight.weight=0.0f;
+	ret->cached_weight.l=0;
+	ret->cached_weight.h=0;
 	ret->cached_weight_is_valid=false;
 
 	return ret;
@@ -122,8 +125,8 @@ void amatrix_save(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 		}
 	}
 
-	backup->cached_weight=amx->cached_weight;
-	backup->cached_weight_is_valid=amx->cached_weight_is_valid;
+	memcpy(&backup->cached_result, &amx->cached_weight, sizeof(struct amatrix_weight_t));
+	backup->cached_result_is_valid=amx->cached_weight_is_valid;
 }
 
 void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
@@ -143,8 +146,8 @@ void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 		}
 	}
 
-	amx->cached_weight=backup->cached_weight;
-	amx->cached_weight_is_valid=backup->cached_weight_is_valid;
+	memcpy(&amx->cached_weight, &backup->cached_result, sizeof(struct amatrix_weight_t));
+	amx->cached_weight_is_valid=backup->cached_result_is_valid;
 }
 
 /*
@@ -370,7 +373,7 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 	Here we calculate the weight associated to a 'amatrix'
 */
 
-double amatrix_weight(struct amatrix_t *amx)
+struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 {
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions>=1);
@@ -388,7 +391,10 @@ double amatrix_weight(struct amatrix_t *amx)
 	}
 
 	if(amatrix_check_connectedness(amx)==false)
-		return 0.0f;
+	{
+		struct amatrix_weight_t ret={0.0,0,0};
+		return ret;
+	}
 
 	/*
 		Dimension 1 is a special case that does not need the evaluation
@@ -413,24 +419,27 @@ double amatrix_weight(struct amatrix_t *amx)
 
 		multiplicity=1.0f;
 
-		amx->cached_weight=amx->config->bias+multiplicity*weight;
+		amx->cached_weight.weight=amx->config->bias+weight/multiplicity;
+		amx->cached_weight.l=0;
+		amx->cached_weight.h=2;
 		amx->cached_weight_is_valid=true;
-		return amx->config->bias+weight/multiplicity;
+
+		return amx->cached_weight;
 	}
 
 	struct label_t labels[MAX_LABELS];
 	int ilabels=0;
 
+	struct amatrix_weight_t ret;
+
 	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, labels, &ilabels);
-
-	double weight,multiplicity;
-
-	weight=incidence_to_weight(incidence, labels, &ilabels, amx);
+	ret=incidence_to_weight(incidence, labels, &ilabels, amx);
 	gsl_matrix_int_free(incidence);
 
-	multiplicity=amatrix_multiplicity(amx);
+	ret.weight=amx->config->bias+ret.weight/amatrix_multiplicity(amx);
 
-	amx->cached_weight=amx->config->bias+weight/multiplicity;
+	amx->cached_weight=ret;
 	amx->cached_weight_is_valid=true;
-	return amx->config->bias+weight/multiplicity;
+
+	return ret;
 }

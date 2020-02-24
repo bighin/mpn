@@ -78,7 +78,7 @@ int count_loops(struct label_t *labels, int *ilabels, int mels[MAX_MATRIX_ELEMEN
 	This function calculates a diagram's weight given the incidence matrix
 */
 
-double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx)
+struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx)
 {
 	bool verbose=false;
 
@@ -283,12 +283,23 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 		numerators*=get_eri(amx->ectx, i1, i2, i3, i4);
 	}
 
-	double lindeloef_factor=exp(amx->config->epsilon*(l+h)*log(l+h));
+	double lindeloef_factor=exp(amx->config->epsilon*h*log(h));
 
 	if(verbose==true)
 		printf("Final weight: %f\n",pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor);
 
-	return pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor;
+	/*
+		Finally we put all the results into an 'amatrix_weight_t' struct and
+		we return it.
+	*/
+
+	struct amatrix_weight_t ret;
+
+	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor;
+	ret.l=l;
+	ret.h=h;
+
+	return ret;
 }
 
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels)

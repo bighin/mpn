@@ -29,7 +29,7 @@ extern "C" {
 
 int update_extend(struct amatrix_t *amx, bool always_accept)
 {
-	double weightratio=1.0f/amatrix_weight(amx);
+	double weightratio=1.0f/amatrix_weight(amx).weight;
 	double probability=1.0f;
 
 	if(amx->pmxs[0]->dimensions>=amx->config->maxorder)
@@ -85,7 +85,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=amatrix_weight(amx);
+	weightratio*=amatrix_weight(amx).weight;
 	acceptance_ratio=fabs(weightratio)*probability;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
@@ -101,7 +101,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 int update_squeeze(struct amatrix_t *amx, bool always_accept)
 {
-	double weightratio=1.0f/amatrix_weight(amx);
+	double weightratio=1.0f/amatrix_weight(amx).weight;
 	double probability=1.0f;
 
 	if(amx->pmxs[0]->dimensions<=amx->config->minorder)
@@ -153,7 +153,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=amatrix_weight(amx);
+	weightratio*=amatrix_weight(amx).weight;
 	acceptance_ratio=fabs(weightratio)*probability;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
@@ -181,7 +181,7 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	if(dimensions==1)
 		return UPDATE_UNPHYSICAL;
 
-	double weightratio=1.0f/amatrix_weight(amx);
+	double weightratio=1.0f/amatrix_weight(amx).weight;
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
@@ -228,7 +228,7 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=amatrix_weight(amx);
+	weightratio*=amatrix_weight(amx).weight;
 	acceptance_ratio=fabs(weightratio);
 	acceptance_ratio*=pow(amx->nr_occupied, update[QTYPE_OCCUPIED]);
 	acceptance_ratio*=pow(amx->nr_virtual, update[QTYPE_VIRTUAL]);
@@ -253,7 +253,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions>=1);
 
-	double weightratio=1.0f/amatrix_weight(amx);
+	double weightratio=1.0f/amatrix_weight(amx).weight;
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
@@ -287,7 +287,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=amatrix_weight(amx);
+	weightratio*=amatrix_weight(amx).weight;
 	acceptance_ratio=fabs(weightratio);
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
@@ -340,12 +340,12 @@ void interrupt_handler(int dummy __attribute__((unused)))
 int do_diagmc(struct configuration_t *config)
 {
 
-#define DIAGRAM_NR_UPDATES	(4)
+#define DIAGRAM_NR_UPDATES        (4)
 
-	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx,bool always_accept);
+	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx, bool always_accept);
 	const char *update_names[DIAGRAM_NR_UPDATES];
 
-	long int proposed[DIAGRAM_NR_UPDATES],accepted[DIAGRAM_NR_UPDATES],rejected[DIAGRAM_NR_UPDATES];
+	long int proposed[DIAGRAM_NR_UPDATES], accepted[DIAGRAM_NR_UPDATES], rejected[DIAGRAM_NR_UPDATES];
 
 	/*
 		We set up the updates we will be using
@@ -376,14 +376,28 @@ int do_diagmc(struct configuration_t *config)
 	assert(config->maxorder<256);
 
 	alps::alea::autocorr_acc<double> autocorrelation(1);
-	alps::alea::batch_acc<double> signs[256];
+	alps::alea::batch_acc<double> signs[256], lsigns[16][16], hsigns[16][16], lhsigns[16][16];
 
-	long int nr_samples,nr_physical_samples,nr_samples_by_order[256],nr_positive_samples[256],nr_negative_samples[256];
+	long int nr_samples, nr_physical_samples, nr_samples_by_order[256], nr_positive_samples[256], nr_negative_samples[256];
+
+	long int nr_positive_samples_l[256][256], nr_negative_samples_l[256][256];
+	long int nr_positive_samples_h[256][256], nr_negative_samples_h[256][256];
+	long int nr_positive_samples_lh[256][256], nr_negative_samples_lh[256][256];
 
 	nr_samples=nr_physical_samples=0;
 
 	for(int c=0;c<256;c++)
 		nr_samples_by_order[c]=nr_positive_samples[c]=nr_negative_samples[c]=0;
+
+	for(int c=0;c<256;c++)
+	{
+		for(int d=0;d<256;d++)
+		{
+			nr_positive_samples_l[c][d]=nr_negative_samples_l[c][d]=0;
+			nr_positive_samples_h[c][d]=nr_negative_samples_h[c][d]=0;
+			nr_positive_samples_lh[c][d]=nr_negative_samples_lh[c][d]=0;
+		}
+	}
 
 	/*
 		We print some informative message, and then we open the log file
@@ -409,9 +423,9 @@ int do_diagmc(struct configuration_t *config)
 		The diagram parameters are loaded from the configuration, as a new 'amatrix' is created
 	*/
 
-	struct amatrix_t *amx;
+	struct amatrix_t *amx=init_amatrix(config);
 
-	if(!(amx=init_amatrix(config)))
+	if(!amx)
 	{
 		fprintf(stderr,"Error: couldn't load the ERIs file (%s).\n",config->erisfile);
 		return 0;
@@ -482,19 +496,34 @@ int do_diagmc(struct configuration_t *config)
 
 			if((counter>config->thermalization)&&((nr_physical_samples%config->decorrelation)==0))
 			{
-				double weight=amatrix_weight(amx);
-				double sign=(weight>0.0f)?(1.0f):(-1.0f);
+				struct amatrix_weight_t ws=amatrix_weight(amx);
+				double sign=(ws.weight>0.0f)?(1.0f):(-1.0f);
 				int order=amx->pmxs[0]->dimensions;
+				int l=ws.l;
+				int h=ws.h;
 
-				autocorrelation << weight;
+				autocorrelation << ws.weight;
 				signs[order] << sign;
+				lsigns[order][l] << sign;
+				hsigns[order][h] << sign;
+				lhsigns[order][l+h] << sign;
 
 				nr_samples_by_order[order]++;
 
-				if(weight>=0.0)
+				if(ws.weight>=0.0)
+				{
 					nr_positive_samples[order]++;
+					nr_positive_samples_l[order][l]++;
+					nr_positive_samples_h[order][h]++;
+					nr_positive_samples_lh[order][l+h]++;
+				}
 				else
+				{
 					nr_negative_samples[order]++;
+					nr_negative_samples_l[order][l]++;
+					nr_negative_samples_h[order][h]++;
+					nr_negative_samples_lh[order][l+h]++;
+				}
 			}
 		}
 
@@ -593,10 +622,20 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Sign (from ALEA)>\n");
 
 	alps::alea::autocorr_result<double> result_autocorrelation=autocorrelation.finalize();
-	alps::alea::batch_result<double> result_signs[256];
+	alps::alea::batch_result<double> result_signs[256], result_lsigns[16][16],result_hsigns[16][16], result_lhsigns[16][16];
 
 	for(int c=0;c<256;c++)
 		result_signs[c]=signs[c].finalize();
+
+	for(int c=0;c<16;c++)
+	{
+		for(int d=0;d<16;d++)
+		{
+			result_lsigns[c][d]=lsigns[c][d].finalize();
+			result_hsigns[c][d]=hsigns[c][d].finalize();
+			result_lhsigns[c][d]=lhsigns[c][d].finalize();
+		}
+	}
 
 	long int total_positive,total_negative;
 
@@ -632,6 +671,51 @@ int do_diagmc(struct configuration_t *config)
 	}
 
 	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
+
+	fprintf(out,"L:\n");
+	for(int c=0;c<16;c++)
+	{
+		double sign=((double)(nr_positive_samples[c]-nr_negative_samples[c]))/((double)(nr_positive_samples[c]+nr_negative_samples[c]));
+		fprintf(out, "(%f[%f]) ", result_signs[c].stderror()(0)/result_signs[c].mean()(0), sign);
+
+		for(int d=0;d<16;d++)
+		{
+			sign=((double)(nr_positive_samples_l[c][d]-nr_negative_samples_l[c][d]))/((double)(nr_positive_samples_l[c][d]+nr_negative_samples_l[c][d]));
+			fprintf(out, "%f[%f] ", result_lsigns[c][d].stderror()(0)/result_lsigns[c][d].mean()(0), sign);
+		}
+
+		fprintf(out,"\n");
+	}
+
+	fprintf(out,"H:\n");
+	for(int c=0;c<16;c++)
+	{
+		double sign=((double)(nr_positive_samples[c]-nr_negative_samples[c]))/((double)(nr_positive_samples[c]+nr_negative_samples[c]));
+		fprintf(out, "(%f[%f]) ", result_signs[c].stderror()(0)/result_signs[c].mean()(0), sign);
+
+		for(int d=0;d<16;d++)
+		{
+			sign=((double)(nr_positive_samples_h[c][d]-nr_negative_samples_h[c][d]))/((double)(nr_positive_samples_h[c][d]+nr_negative_samples_h[c][d]));
+			fprintf(out, "%f[%f] ", result_hsigns[c][d].stderror()(0)/result_hsigns[c][d].mean()(0), sign);
+		}
+
+		fprintf(out,"\n");
+	}
+
+	fprintf(out,"LH:\n");
+	for(int c=0;c<16;c++)
+	{
+		double sign=((double)(nr_positive_samples[c]-nr_negative_samples[c]))/((double)(nr_positive_samples[c]+nr_negative_samples[c]));
+		fprintf(out, "(%f[%f]) ", result_signs[c].stderror()(0)/result_signs[c].mean()(0), sign);
+
+		for(int d=0;d<16;d++)
+		{
+			sign=((double)(nr_positive_samples_lh[c][d]-nr_negative_samples_lh[c][d]))/((double)(nr_positive_samples_lh[c][d]+nr_negative_samples_lh[c][d]));
+			fprintf(out, "%f[%f] ", result_lhsigns[c][d].stderror()(0)/result_lhsigns[c][d].mean()(0), sign);
+		}
+
+		fprintf(out,"\n");
+	}
 
 	//auto divide = [] (double x,double y) -> double { return x/y; };
 	//auto joined_data=alps::alea::join(result_signs[1],result_signs[2]);
