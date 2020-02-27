@@ -383,7 +383,7 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 
 #ifndef NDEBUG
 		amx->cached_weight_is_valid=false;
-		assert(amx->cached_weight==amatrix_weight(amx));
+		assert(amx->cached_weight.weight==amatrix_weight(amx).weight);
 		amx->cached_weight_is_valid=true;
 #endif
 

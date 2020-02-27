@@ -356,6 +356,7 @@ int do_diagmc(struct configuration_t *config)
 	const char *update_names[DIAGRAM_NR_UPDATES];
 
 	long int proposed[DIAGRAM_NR_UPDATES], accepted[DIAGRAM_NR_UPDATES], rejected[DIAGRAM_NR_UPDATES];
+	int update_probability[DIAGRAM_NR_UPDATES],cumulative_probability[DIAGRAM_NR_UPDATES];
 
 	/*
 		We set up the updates we will be using
@@ -370,6 +371,20 @@ int do_diagmc(struct configuration_t *config)
 	update_names[1]="Squeeze";
 	update_names[2]="Shuffle";
 	update_names[3]="Modify";
+
+	update_probability[0]=1;
+	update_probability[1]=1;
+	update_probability[2]=1;
+	update_probability[3]=1;
+
+	/*
+		Here we calculate the cumulative probabilities from the update probabilities.
+	*/
+
+	cumulative_probability[0]=update_probability[0];
+
+	for(int c=1;c<DIAGRAM_NR_UPDATES;c++)
+		cumulative_probability[c]=update_probability[c]+cumulative_probability[c-1];
 
 	/*
 		We reset the update statistics
@@ -469,9 +484,22 @@ int do_diagmc(struct configuration_t *config)
 	long int counter;
 	for(counter=0;(counter<config->iterations)&&(keep_running==1);counter++)
 	{
-		int update_type,status;
+		int update_type,status,selector;
 
-		update_type=gsl_rng_uniform_int(amx->rng_ctx, DIAGRAM_NR_UPDATES);
+		selector=gsl_rng_uniform_int(amx->rng_ctx, cumulative_probability[DIAGRAM_NR_UPDATES-1]);
+
+		for(int c=0;c<DIAGRAM_NR_UPDATES;c++)
+		{
+			if(cumulative_probability[c]>selector)
+			{
+				update_type=c;
+				break;
+			}
+		}
+
+		printf("%d\n",update_type);
+		fflush(stdout);
+
 		status=updates[update_type](amx, false);
 		proposed[update_type]++;
 
