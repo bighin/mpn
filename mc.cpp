@@ -301,59 +301,6 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
-int update_mirror1(struct amatrix_t *amx, bool always_accept)
-{
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
-	assert(amx->pmxs[0]->dimensions>=1);
-
-	double weightratio=1.0f/amatrix_weight(amx).weight;
-
-	struct amatrix_backup_t backup;
-	amatrix_save(amx, &backup);
-
-	/*
-		We mirror the first pmatrix
-	*/
-
-	for(int i=0;i<dimensions/2;i++)
-	{
-		for(int j=0;j<dimensions;j++)
-		{
-			int one,two;
-
-			one=pmatrix_get_entry(amx->pmxs[0], i, j);
-			two=pmatrix_get_entry(amx->pmxs[0], dimensions-1-i, j);
-
-			pmatrix_set_entry(amx->pmxs[0], i, j, two);
-			pmatrix_set_entry(amx->pmxs[0], dimensions-1-i, j, one);
-		}
-	}
-
-	amx->cached_weight_is_valid=false;
-
-	/*
-		The update is balanced with itself, the acceptance ratio is simply given
-		by the (modulus of the) weights ratio.
-	*/
-
-	double acceptance_ratio;
-
-	weightratio*=amatrix_weight(amx).weight;
-	acceptance_ratio=fabs(weightratio);
-
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
-
-	if((is_accepted==false)&&(always_accept==false))
-	{
-		amatrix_restore(amx, &backup);
-		return UPDATE_REJECTED;
-	}
-
-	return UPDATE_ACCEPTED;
-}
-
 /*
 	Auxiliary functions
 */
@@ -403,7 +350,7 @@ void interrupt_handler(int dummy __attribute__((unused)))
 int do_diagmc(struct configuration_t *config)
 {
 
-#define DIAGRAM_NR_UPDATES        (5)
+#define DIAGRAM_NR_UPDATES        (4)
 
 	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx, bool always_accept);
 	const char *update_names[DIAGRAM_NR_UPDATES];
@@ -418,13 +365,11 @@ int do_diagmc(struct configuration_t *config)
 	updates[1]=update_squeeze;
 	updates[2]=update_shuffle;
 	updates[3]=update_modify;
-	updates[4]=update_mirror1;
 
 	update_names[0]="Extend";
 	update_names[1]="Squeeze";
 	update_names[2]="Shuffle";
 	update_names[3]="Modify";
-	update_names[4]="Mirror";
 
 	/*
 		We reset the update statistics
