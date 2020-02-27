@@ -301,6 +301,59 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
+int update_mirror1(struct amatrix_t *amx, bool always_accept)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
+	assert(amx->pmxs[0]->dimensions>=1);
+
+	double weightratio=1.0f/amatrix_weight(amx).weight;
+
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
+
+	/*
+		We mirror the first pmatrix
+	*/
+
+	for(int i=0;i<dimensions/2;i++)
+	{
+		for(int j=0;j<dimensions;j++)
+		{
+			int one,two;
+
+			one=pmatrix_get_entry(amx->pmxs[0], i, j);
+			two=pmatrix_get_entry(amx->pmxs[0], dimensions-1-i, j);
+
+			pmatrix_set_entry(amx->pmxs[0], i, j, two);
+			pmatrix_set_entry(amx->pmxs[0], dimensions-1-i, j, one);
+		}
+	}
+
+	amx->cached_weight_is_valid=false;
+
+	/*
+		The update is balanced with itself, the acceptance ratio is simply given
+		by the (modulus of the) weights ratio.
+	*/
+
+	double acceptance_ratio;
+
+	weightratio*=amatrix_weight(amx).weight;
+	acceptance_ratio=fabs(weightratio);
+
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+
+	if((is_accepted==false)&&(always_accept==false))
+	{
+		amatrix_restore(amx, &backup);
+		return UPDATE_REJECTED;
+	}
+
+	return UPDATE_ACCEPTED;
+}
+
 /*
 	Auxiliary functions
 */
@@ -322,6 +375,16 @@ void show_update_statistics(FILE *out,long int proposed,long int accepted,long i
 	fprintf(out,"proposed %ld, accepted %ld (%f%%), rejected %ld (%f%%).\n",proposed,accepted,accepted_pct,rejected,rejected_pct);
 }
 
+void order_description(char *buf,int length,int order)
+{
+	if(order==1)
+		snprintf(buf,length,"HF");
+	else
+		snprintf(buf,length,"MP%d",order);
+
+	buf[length-1]='\0';
+}
+
 static volatile int keep_running=1;
 
 void interrupt_handler(int dummy __attribute__((unused)))
@@ -340,7 +403,7 @@ void interrupt_handler(int dummy __attribute__((unused)))
 int do_diagmc(struct configuration_t *config)
 {
 
-#define DIAGRAM_NR_UPDATES        (4)
+#define DIAGRAM_NR_UPDATES        (5)
 
 	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx, bool always_accept);
 	const char *update_names[DIAGRAM_NR_UPDATES];
@@ -355,11 +418,13 @@ int do_diagmc(struct configuration_t *config)
 	updates[1]=update_squeeze;
 	updates[2]=update_shuffle;
 	updates[3]=update_modify;
+	updates[4]=update_mirror1;
 
 	update_names[0]="Extend";
 	update_names[1]="Squeeze";
 	update_names[2]="Shuffle";
 	update_names[3]="Modify";
+	update_names[4]="Mirror";
 
 	/*
 		We reset the update statistics
@@ -668,6 +733,29 @@ int do_diagmc(struct configuration_t *config)
 		*/
 
 		fprintf(out, "%f+-%f\n",result_signs[order].mean()(0),result_signs[order].stderror()(0));
+	}
+
+	fprintf(out,"# Order-by-order ratios:\n");
+
+	for(int order1=amx->config->minorder;order1<=amx->config->maxorder;order1++)
+	{
+		for(int order2=amx->config->minorder;order2<=amx->config->maxorder;order2++)
+		{
+			if(order1==order2)
+				continue;
+
+			double pct1,pct2;
+
+			pct1=((double)(nr_positive_samples[order1]-nr_negative_samples[order1]))/(total_positive-total_negative);
+			pct2=((double)(nr_positive_samples[order2]-nr_negative_samples[order2]))/(total_positive-total_negative);
+
+			char desc1[128],desc2[128];
+
+			order_description(desc1,128,order1);
+			order_description(desc2,128,order2);
+
+			fprintf(out,"%s/%s %f\n", desc1, desc2, pct1/pct2);
+		}
 	}
 
 	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));

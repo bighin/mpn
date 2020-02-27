@@ -368,14 +368,20 @@ void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int
 			*/
 
 			if((pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL))
+			{
 				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value(pmx, rngctx, i2, j));
+				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value(pmx, rngctx, i1, j));
+			}
 
 			/*
 				Going from virtual to occupied
 			*/
 
 			if((pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED))
+			{
 				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value(pmx, rngctx, i2, j));
+				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value(pmx, rngctx, i1, j));
+			}
 
 #ifndef NDEBUG
 			if((pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL)) x2++;
@@ -413,14 +419,20 @@ void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int
 			*/
 
 			if((pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL))
+			{
 				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value(pmx, rngctx, i1, j));
+				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value(pmx, rngctx, i2, j));
+			}
 
 			/*
 				Going from virtual to occupied
 			*/
 
 			if((pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED))
+			{
 				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value(pmx, rngctx, i1, j));
+				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value(pmx, rngctx, i2, j));
+			}
 
 #ifndef NDEBUG
 			if((pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL)) x2++;
@@ -495,14 +507,20 @@ void pmatrix_swap_cols(struct pmatrix_t *pmx, int j1, int j2, int update[2], int
 			*/
 
 			if((pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL))
+			{
 				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value(pmx, rngctx, i, j2));
+				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value(pmx, rngctx, i, j1));
+			}
 
 			/*
 				Going from virtual to occupied
 			*/
 
 			if((pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED))
+			{
 				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value(pmx, rngctx, i, j2));
+				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value(pmx, rngctx, i, j1));
+			}
 
 #ifndef NDEBUG
 			if((pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL)) x2++;
@@ -536,14 +554,20 @@ void pmatrix_swap_cols(struct pmatrix_t *pmx, int j1, int j2, int update[2], int
 			*/
 
 			if((pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL))
+			{
 				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value(pmx, rngctx, i, j1));
+				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value(pmx, rngctx, i, j2));
+			}
 
 			/*
 				Going from virtual to occupied
 			*/
 
 			if((pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED))
+			{
 				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value(pmx, rngctx, i, j1));
+				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value(pmx, rngctx, i, j2));
+			}
 
 #ifndef NDEBUG
 			if((pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL)) x2++;
