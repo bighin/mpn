@@ -44,8 +44,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	switch(pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i, &j))
 	{
 		case 1:
-		probability*=((dimensions+1)*amx->nr_virtual*amx->nr_occupied);
-		probability/=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_occupied):(amx->nr_virtual);
+		probability*=((dimensions+1)*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_virtual):(amx->nr_occupied)));
 		break;
 
 		case 2:
@@ -62,8 +61,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	switch(pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i, &j))
 	{
 		case 1:
-		probability*=((dimensions+1)*amx->nr_virtual*amx->nr_occupied);
-		probability/=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED) ? (amx->nr_occupied) : (amx->nr_virtual);
+		probability*=((dimensions+1)*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_virtual):(amx->nr_occupied)));
 		break;
 
 		case 2:
@@ -116,8 +114,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	switch(pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx, &i, &j))
 	{
 		case 1:
-		probability/=(dimensions*amx->nr_virtual*amx->nr_occupied);
-		probability*=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_occupied):(amx->nr_virtual);
+		probability/=(dimensions*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_virtual):(amx->nr_occupied)));
 		break;
 
 		case 2:
@@ -134,8 +131,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	switch(pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx, &i, &j))
 	{
 		case 1:
-		probability/=(dimensions*amx->nr_virtual*amx->nr_occupied);
-		probability*=(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED) ? (amx->nr_occupied) : (amx->nr_virtual);
+		probability/=(dimensions*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_virtual):(amx->nr_occupied)));
 		break;
 
 		case 2:
