@@ -187,12 +187,6 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	amatrix_save(amx, &backup);
 
 	/*
-		We select which one of the permutation matrices we want to play with
-	*/
-
-	struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
-
-	/*
 		We select the rows/columns we want to swap.
 
 		Note that we are choosing the first one among dims possible choices,
@@ -216,11 +210,13 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	switch(gsl_rng_uniform_int(amx->rng_ctx, 2))
 	{
 		case 0:
-		pmatrix_swap_rows(target, i, j, update, reverse, amx->rng_ctx);
+		pmatrix_swap_rows(amx->pmxs[0], i, j, update, reverse, amx->rng_ctx);
+		pmatrix_swap_rows(amx->pmxs[1], i, j, update, reverse, amx->rng_ctx);
 		break;
 
 		case 1:
-		pmatrix_swap_cols(target, i, j, update, reverse, amx->rng_ctx);
+		pmatrix_swap_cols(amx->pmxs[0], i, j, update, reverse, amx->rng_ctx);
+		pmatrix_swap_cols(amx->pmxs[1], i, j, update, reverse, amx->rng_ctx);
 		break;
 	}
 
@@ -301,6 +297,92 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
+int update_swapq(struct amatrix_t *amx, bool always_accept)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
+	assert(amx->pmxs[0]->dimensions>=1);
+
+	double weightratio=1.0f/amatrix_weight(amx).weight;
+
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
+
+	/*
+		We select which one of the permutation matrices we want to play with
+	*/
+
+	struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
+
+	/*
+		We select the type of quantum numbers we will be playing with
+	*/
+
+	int qtype=(gsl_rng_uniform_int(amx->rng_ctx, 2)==0)?(QTYPE_OCCUPIED):(QTYPE_VIRTUAL);
+
+	/*
+		We go through all the quantum number in the target pmatrix of the chosen type...
+	*/
+
+	int qs[512][2];
+	int iqs=0;
+
+	for(int i=0;i<dimensions;i++)
+	{
+		for(int j=0;j<dimensions;j++)
+		{
+			if((pmatrix_get_entry(target, i, j)!=0)&&(pmatrix_entry_type(i, j)==qtype))
+			{
+				qs[iqs][0]=i;
+				qs[iqs][1]=j;
+				iqs++;
+			}
+		}
+	}
+
+	/*
+		...and we swap two of them!
+	*/
+
+	if(iqs<=1)
+		return UPDATE_UNPHYSICAL;
+
+	int x=gsl_rng_uniform_int(amx->rng_ctx, iqs);
+	int y=gsl_rng_uniform_int(amx->rng_ctx, iqs-1);
+
+	if(y>=x)
+		y++;
+
+	int xvalue=pmatrix_get_entry(target,qs[x][0],qs[x][1]);
+	int yvalue=pmatrix_get_entry(target,qs[y][0],qs[y][1]);
+
+	pmatrix_set_entry(target, qs[x][0],qs[x][1],yvalue);
+	pmatrix_set_entry(target, qs[y][0],qs[y][1],xvalue);
+
+	amx->cached_weight_is_valid=false;
+
+	/*
+		The update is balanced with itself, the acceptance ratio is simply given
+		by the (modulus of the) weights ratio.
+	*/
+
+	double acceptance_ratio;
+
+	weightratio*=amatrix_weight(amx).weight;
+	acceptance_ratio=fabs(weightratio);
+
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+
+	if((is_accepted==false)&&(always_accept==false))
+	{
+		amatrix_restore(amx, &backup);
+		return UPDATE_REJECTED;
+	}
+
+	return UPDATE_ACCEPTED;
+}
+
 /*
 	Auxiliary functions
 */
@@ -350,7 +432,7 @@ void interrupt_handler(int dummy __attribute__((unused)))
 int do_diagmc(struct configuration_t *config)
 {
 
-#define DIAGRAM_NR_UPDATES        (4)
+#define DIAGRAM_NR_UPDATES        (5)
 
 	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx, bool always_accept);
 	const char *update_names[DIAGRAM_NR_UPDATES];
@@ -366,16 +448,24 @@ int do_diagmc(struct configuration_t *config)
 	updates[1]=update_squeeze;
 	updates[2]=update_shuffle;
 	updates[3]=update_modify;
+	updates[4]=update_swapq;
 
 	update_names[0]="Extend";
 	update_names[1]="Squeeze";
 	update_names[2]="Shuffle";
 	update_names[3]="Modify";
+	update_names[4]="SwapQ";
+
+	/*
+		Here one can specify the (relative) probabilities for each update.
+		Note that in case of balanced pairs, the probabilities must be equal.
+	*/
 
 	update_probability[0]=1;
 	update_probability[1]=1;
 	update_probability[2]=1;
 	update_probability[3]=1;
+	update_probability[4]=1;
 
 	/*
 		Here we calculate the cumulative probabilities from the update probabilities.
@@ -487,6 +577,7 @@ int do_diagmc(struct configuration_t *config)
 		int update_type,status,selector;
 
 		selector=gsl_rng_uniform_int(amx->rng_ctx, cumulative_probability[DIAGRAM_NR_UPDATES-1]);
+		update_type=-1;
 
 		for(int c=0;c<DIAGRAM_NR_UPDATES;c++)
 		{
@@ -497,8 +588,7 @@ int do_diagmc(struct configuration_t *config)
 			}
 		}
 
-		printf("%d\n",update_type);
-		fflush(stdout);
+		assert(update_type!=-1);
 
 		status=updates[update_type](amx, false);
 		proposed[update_type]++;
