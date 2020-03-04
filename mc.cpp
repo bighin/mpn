@@ -401,28 +401,14 @@ int do_diagmc(struct configuration_t *config)
 	assert(config->maxorder<256);
 
 	alps::alea::autocorr_acc<double> autocorrelation(1);
-	alps::alea::batch_acc<double> overall_sign, signs[256], lsigns[16][16], hsigns[16][16], lhsigns[16][16];
+	alps::alea::batch_acc<double> overall_sign, signs[256];
 
 	long int nr_samples, nr_physical_samples, nr_samples_by_order[256], nr_positive_samples[256], nr_negative_samples[256];
-
-	long int nr_positive_samples_l[256][256], nr_negative_samples_l[256][256];
-	long int nr_positive_samples_h[256][256], nr_negative_samples_h[256][256];
-	long int nr_positive_samples_lh[256][256], nr_negative_samples_lh[256][256];
 
 	nr_samples=nr_physical_samples=0;
 
 	for(int c=0;c<256;c++)
 		nr_samples_by_order[c]=nr_positive_samples[c]=nr_negative_samples[c]=0;
-
-	for(int c=0;c<256;c++)
-	{
-		for(int d=0;d<256;d++)
-		{
-			nr_positive_samples_l[c][d]=nr_negative_samples_l[c][d]=0;
-			nr_positive_samples_h[c][d]=nr_negative_samples_h[c][d]=0;
-			nr_positive_samples_lh[c][d]=nr_negative_samples_lh[c][d]=0;
-		}
-	}
 
 	/*
 		We print some informative message, and then we open the log file
@@ -487,6 +473,7 @@ int do_diagmc(struct configuration_t *config)
 		int update_type,status,selector;
 
 		selector=gsl_rng_uniform_int(amx->rng_ctx, cumulative_probability[DIAGRAM_NR_UPDATES-1]);
+		update_type=-1;
 
 		for(int c=0;c<DIAGRAM_NR_UPDATES;c++)
 		{
@@ -497,8 +484,7 @@ int do_diagmc(struct configuration_t *config)
 			}
 		}
 
-		printf("%d\n",update_type);
-		fflush(stdout);
+		assert(update_type!=-1);
 
 		status=updates[update_type](amx, false);
 		proposed[update_type]++;
@@ -537,31 +523,20 @@ int do_diagmc(struct configuration_t *config)
 				struct amatrix_weight_t ws=amatrix_weight(amx);
 				double sign=(ws.weight>0.0f)?(1.0f):(-1.0f);
 				int order=amx->pmxs[0]->dimensions;
-				int l=ws.l;
-				int h=ws.h;
 
 				autocorrelation << ws.weight;
 				overall_sign << sign;
 				signs[order] << sign;
-				lsigns[order][l] << sign;
-				hsigns[order][h] << sign;
-				lhsigns[order][l+h] << sign;
 
 				nr_samples_by_order[order]++;
 
 				if(ws.weight>=0.0)
 				{
 					nr_positive_samples[order]++;
-					nr_positive_samples_l[order][l]++;
-					nr_positive_samples_h[order][h]++;
-					nr_positive_samples_lh[order][l+h]++;
 				}
 				else
 				{
 					nr_negative_samples[order]++;
-					nr_negative_samples_l[order][l]++;
-					nr_negative_samples_h[order][h]++;
-					nr_negative_samples_lh[order][l+h]++;
 				}
 			}
 		}
@@ -669,16 +644,6 @@ int do_diagmc(struct configuration_t *config)
 	for(int c=0;c<256;c++)
 		result_signs[c]=signs[c].finalize();
 
-	for(int c=0;c<16;c++)
-	{
-		for(int d=0;d<16;d++)
-		{
-			result_lsigns[c][d]=lsigns[c][d].finalize();
-			result_hsigns[c][d]=hsigns[c][d].finalize();
-			result_lhsigns[c][d]=lhsigns[c][d].finalize();
-		}
-	}
-
 	long int total_positive,total_negative;
 
 	total_positive=total_negative=0;
@@ -722,66 +687,35 @@ int do_diagmc(struct configuration_t *config)
 			if(order1==order2)
 				continue;
 
-			double pct1,pct2;
+			/*
+				We calculate the contributions at each order, their standard error,
+				and then we calculation the ratio and its error using the usual
+				error propagation formula.
+			*/
 
-			pct1=((double)(nr_positive_samples[order1]-nr_negative_samples[order1]))/(total_positive-total_negative);
-			pct2=((double)(nr_positive_samples[order2]-nr_negative_samples[order2]))/(total_positive-total_negative);
+			double S1,S2,sigmaS1,sigmaS2;
+
+			S1=nr_positive_samples[order1]-nr_negative_samples[order1];
+			S2=nr_positive_samples[order2]-nr_negative_samples[order2];
+
+			sigmaS1=(nr_positive_samples[order1]+nr_negative_samples[order1])*result_signs[order1].stderror()(0);
+			sigmaS2=(nr_positive_samples[order2]+nr_negative_samples[order2])*result_signs[order2].stderror()(0);
 
 			char desc1[128],desc2[128];
 
 			order_description(desc1,128,order1);
 			order_description(desc2,128,order2);
 
-			fprintf(out,"%s/%s %f\n", desc1, desc2, pct1/pct2);
+			double ratio, sigmaratio;
+
+			ratio=S1/S2;
+			sigmaratio=ratio*sqrt(pow(sigmaS1/S1,2.0f)+pow(sigmaS2/S2,2.0f));
+
+			fprintf(out,"%s/%s %f +- %f (%f%%)\n", desc1, desc2, ratio, sigmaratio, 100.0f*sigmaratio/ratio);
 		}
 	}
 
 	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
-
-	fprintf(out,"L:\n");
-	for(int c=0;c<16;c++)
-	{
-		double sign=((double)(nr_positive_samples[c]-nr_negative_samples[c]))/((double)(nr_positive_samples[c]+nr_negative_samples[c]));
-		fprintf(out, "(%f[%f]) ", result_signs[c].stderror()(0)/result_signs[c].mean()(0), sign);
-
-		for(int d=0;d<16;d++)
-		{
-			sign=((double)(nr_positive_samples_l[c][d]-nr_negative_samples_l[c][d]))/((double)(nr_positive_samples_l[c][d]+nr_negative_samples_l[c][d]));
-			fprintf(out, "%f[%f] ", result_lsigns[c][d].stderror()(0)/result_lsigns[c][d].mean()(0), sign);
-		}
-
-		fprintf(out,"\n");
-	}
-
-	fprintf(out,"H:\n");
-	for(int c=0;c<16;c++)
-	{
-		double sign=((double)(nr_positive_samples[c]-nr_negative_samples[c]))/((double)(nr_positive_samples[c]+nr_negative_samples[c]));
-		fprintf(out, "(%f[%f]) ", result_signs[c].stderror()(0)/result_signs[c].mean()(0), sign);
-
-		for(int d=0;d<16;d++)
-		{
-			sign=((double)(nr_positive_samples_h[c][d]-nr_negative_samples_h[c][d]))/((double)(nr_positive_samples_h[c][d]+nr_negative_samples_h[c][d]));
-			fprintf(out, "%f[%f] ", result_hsigns[c][d].stderror()(0)/result_hsigns[c][d].mean()(0), sign);
-		}
-
-		fprintf(out,"\n");
-	}
-
-	fprintf(out,"LH:\n");
-	for(int c=0;c<16;c++)
-	{
-		double sign=((double)(nr_positive_samples[c]-nr_negative_samples[c]))/((double)(nr_positive_samples[c]+nr_negative_samples[c]));
-		fprintf(out, "(%f[%f]) ", result_signs[c].stderror()(0)/result_signs[c].mean()(0), sign);
-
-		for(int d=0;d<16;d++)
-		{
-			sign=((double)(nr_positive_samples_lh[c][d]-nr_negative_samples_lh[c][d]))/((double)(nr_positive_samples_lh[c][d]+nr_negative_samples_lh[c][d]));
-			fprintf(out, "%f[%f] ", result_lhsigns[c][d].stderror()(0)/result_lhsigns[c][d].mean()(0), sign);
-		}
-
-		fprintf(out,"\n");
-	}
 
 	//auto divide = [] (double x,double y) -> double { return x/y; };
 	//auto joined_data=alps::alea::join(result_signs[1],result_signs[2]);
