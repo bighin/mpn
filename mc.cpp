@@ -401,7 +401,7 @@ int do_diagmc(struct configuration_t *config)
 	assert(config->maxorder<256);
 
 	alps::alea::autocorr_acc<double> autocorrelation(1);
-	alps::alea::batch_acc<double> signs[256], lsigns[16][16], hsigns[16][16], lhsigns[16][16];
+	alps::alea::batch_acc<double> overall_sign, signs[256], lsigns[16][16], hsigns[16][16], lhsigns[16][16];
 
 	long int nr_samples, nr_physical_samples, nr_samples_by_order[256], nr_positive_samples[256], nr_negative_samples[256];
 
@@ -541,6 +541,7 @@ int do_diagmc(struct configuration_t *config)
 				int h=ws.h;
 
 				autocorrelation << ws.weight;
+				overall_sign << sign;
 				signs[order] << sign;
 				lsigns[order][l] << sign;
 				hsigns[order][h] << sign;
@@ -600,6 +601,7 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"#\n");
 	fprintf(out,"# Electron repulsion integrals loaded from '%s'\n",config->erisfile);
 	fprintf(out,"# Output file is '%s'\n",output);
+	fprintf(out,"# Binary compiled from git commit %s\n",GITCOMMIT);
 	fprintf(out,"#\n");
 	fprintf(out,"# Bias: %f\n",config->bias);
 	fprintf(out,"# Unphysical penalty: %f\n",config->unphysicalpenalty);
@@ -660,7 +662,9 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Sign (from ALEA)>\n");
 
 	alps::alea::autocorr_result<double> result_autocorrelation=autocorrelation.finalize();
-	alps::alea::batch_result<double> result_signs[256], result_lsigns[16][16],result_hsigns[16][16], result_lhsigns[16][16];
+	alps::alea::batch_result<double> result_overall_sign, result_signs[256], result_lsigns[16][16],result_hsigns[16][16], result_lhsigns[16][16];
+
+	result_overall_sign=overall_sign.finalize();
 
 	for(int c=0;c<256;c++)
 		result_signs[c]=signs[c].finalize();
@@ -708,6 +712,7 @@ int do_diagmc(struct configuration_t *config)
 		fprintf(out, "%f+-%f\n",result_signs[order].mean()(0),result_signs[order].stderror()(0));
 	}
 
+	fprintf(out,"# Overall sign: %f+-%f\n",result_overall_sign.mean()(0),result_overall_sign.stderror()(0));
 	fprintf(out,"# Order-by-order ratios:\n");
 
 	for(int order1=amx->config->minorder;order1<=amx->config->maxorder;order1++)
