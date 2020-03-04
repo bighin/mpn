@@ -201,18 +201,8 @@ int pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *ta
 
 		int newvalues[2];
 
-		if(pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))
-			newvalues[0]=pmatrix_get_entry(pmx, i, j);
-		else
-			newvalues[0]=pmatrix_get_new_value(pmx, rngctx, i, pmx->dimensions-1);
-
-		if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
-			newvalues[1]=pmatrix_get_entry(pmx, i, j);
-		else
-			newvalues[1]=pmatrix_get_new_value(pmx, rngctx, pmx->dimensions-1, j);
-
-		assert((pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))!=
-		       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
+		newvalues[0]=pmatrix_get_new_value(pmx, rngctx, i, pmx->dimensions-1);
+		newvalues[1]=pmatrix_get_new_value(pmx, rngctx, pmx->dimensions-1, j);
 
 		pmatrix_set_entry(pmx, i, pmx->dimensions-1, newvalues[0]);
 		pmatrix_set_entry(pmx, pmx->dimensions-1, j, newvalues[1]);
@@ -323,18 +313,10 @@ int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *t
 	assert(pmatrix_get_entry(pmx, i, pmx->dimensions-1)!=0);
 	assert(pmatrix_get_entry(pmx, pmx->dimensions-1, j)!=0);
 
-	int newvalue=-1;
-
-	if(pmatrix_entry_type(i, pmx->dimensions-1)==pmatrix_entry_type(i,j))
-		newvalue=pmatrix_get_entry(pmx, i, pmx->dimensions-1);
-	else if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
-		newvalue=pmatrix_get_entry(pmx, pmx->dimensions-1, j);
-
-	assert(newvalue!=-1);
-
 	pmatrix_set_entry(pmx, i, pmx->dimensions-1, 0);
 	pmatrix_set_entry(pmx, pmx->dimensions-1, j, 0);
 
+	int newvalue=pmatrix_get_new_value(pmx, rngctx, i, j);
 	pmatrix_set_entry(pmx, i, j, newvalue);
 
 	pmx->dimensions--;
