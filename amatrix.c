@@ -42,7 +42,7 @@ struct amatrix_t *init_amatrix(struct configuration_t *config)
 
 		/*
 			Here we set some default values. However, if the ERI file is not loaded,
-			the number of occupied/virtual orbitals doesn't make a lot of sense.
+			the number of occupied/virtual orbitals don't make a lot of sense.
 		*/
 
 		ret->nr_occupied=10;
