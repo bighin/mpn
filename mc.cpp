@@ -207,6 +207,9 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 
 	int update[2],reverse[2];
 
+	update[QTYPE_OCCUPIED]=update[QTYPE_VIRTUAL]=0;
+	reverse[QTYPE_OCCUPIED]=reverse[QTYPE_VIRTUAL]=0;
+
 	switch(gsl_rng_uniform_int(amx->rng_ctx, 2))
 	{
 		case 0:
