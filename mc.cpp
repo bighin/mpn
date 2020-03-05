@@ -187,6 +187,12 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	amatrix_save(amx, &backup);
 
 	/*
+		We select which one of the permutation matrices we want to play with
+	*/
+
+	struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
+
+	/*
 		We select the rows/columns we want to swap.
 
 		Note that we are choosing the first one among dims possible choices,
@@ -210,13 +216,11 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	switch(gsl_rng_uniform_int(amx->rng_ctx, 2))
 	{
 		case 0:
-		pmatrix_swap_rows(amx->pmxs[0], i, j, update, reverse, amx->rng_ctx);
-		pmatrix_swap_rows(amx->pmxs[1], i, j, update, reverse, amx->rng_ctx);
+		pmatrix_swap_rows(target, i, j, update, reverse, amx->rng_ctx);
 		break;
 
 		case 1:
-		pmatrix_swap_cols(amx->pmxs[0], i, j, update, reverse, amx->rng_ctx);
-		pmatrix_swap_cols(amx->pmxs[1], i, j, update, reverse, amx->rng_ctx);
+		pmatrix_swap_cols(target, i, j, update, reverse, amx->rng_ctx);
 		break;
 	}
 
@@ -673,7 +677,7 @@ int do_diagmc(struct configuration_t *config)
 		fprintf(out, "%f+-%f\n",result_signs[order].mean()(0),result_signs[order].stderror()(0));
 	}
 
-	fprintf(out,"# Overall sign: %f +- %f\n",result_overall_sign.mean()(0),result_overall_sign.stderror()(0));
+	fprintf(out,"# Overall sign: %f+-%f\n",result_overall_sign.mean()(0),result_overall_sign.stderror()(0));
 	fprintf(out,"# Order-by-order ratios:\n");
 
 	for(int order1=amx->config->minorder;order1<=amx->config->maxorder;order1++)
