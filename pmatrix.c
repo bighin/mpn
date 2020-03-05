@@ -335,6 +335,8 @@ void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int
 	assert(i2<pmx->dimensions);
 	assert(pmatrix_check_consistency(pmx)==true);
 
+	update[QTYPE_OCCUPIED]=update[QTYPE_VIRTUAL]=reverse[QTYPE_OCCUPIED]=reverse[QTYPE_VIRTUAL]=0;
+
 #ifndef NDEBUG
 	int x1=0,x2=0;
 #endif
@@ -463,6 +465,8 @@ void pmatrix_swap_cols(struct pmatrix_t *pmx, int j1, int j2, int update[2], int
 #ifndef NDEBUG
 	int x1=0,x2=0;
 #endif
+
+	update[QTYPE_OCCUPIED]=update[QTYPE_VIRTUAL]=reverse[QTYPE_OCCUPIED]=reverse[QTYPE_VIRTUAL]=0;
 
 	/*
 		How many occupied and virtual entries are there in the i1-th row?
