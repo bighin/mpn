@@ -41,6 +41,15 @@ int configuration_handler(void *user,const char *section,const char *name,const 
 	{
 		pconfig->erisfile=strdup(value);
 	}
+	else if(MATCH("general","seedrng"))
+	{
+		if(!strcmp(value,"true"))
+			pconfig->seedrng=true;
+		else if(!strcmp(value,"false"))
+			pconfig->seedrng=false;
+		else
+			return 0;
+	}
 	else if(MATCH("parameters","bias"))
 	{
 		pconfig->bias=atof(value);
@@ -91,6 +100,7 @@ void load_config_defaults(struct configuration_t *config)
 	config->prefix=strdup("default");
 	config->progressbar=false;
 	config->erisfile=NULL;
+	config->seedrng=true;
 
 	config->bias=0.0f;
 	config->unphysicalpenalty=0.01f;

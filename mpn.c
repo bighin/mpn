@@ -190,17 +190,17 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 				switch(labels[j].qtype)
 				{
 					case QTYPE_OCCUPIED:
-						denominator+=get_occupied_energy(amx->ectx,labels[j].value-1);
-						energies_in_denominator++;
-						break;
+					denominator+=get_occupied_energy(amx->ectx,labels[j].value-1);
+					energies_in_denominator++;
+					break;
 
 					case QTYPE_VIRTUAL:
-						denominator-=get_virtual_energy(amx->ectx,labels[j].value-1);
-						energies_in_denominator++;
-						break;
+					denominator-=get_virtual_energy(amx->ectx,labels[j].value-1);
+					energies_in_denominator++;
+					break;
 
 					default:
-						assert(false);
+					assert(false);
 				}
 			}
 		}

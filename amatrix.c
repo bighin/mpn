@@ -51,7 +51,9 @@ struct amatrix_t *init_amatrix(struct configuration_t *config)
 
 	ret->rng_ctx=gsl_rng_alloc(gsl_rng_mt19937);
 	assert(ret->rng_ctx!=NULL);
-	seed_rng(ret->rng_ctx);
+
+	if(config->seedrng==true)
+		seed_rng(ret->rng_ctx);
 
 	ret->pmxs[0]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);
 	ret->pmxs[1]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);

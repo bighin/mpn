@@ -1,0 +1,6 @@
+- At some point the precision with which we load the ERIs will likely be important!
+
+- No calls to gsl_matrix_int_alloc(), just reuse a number of preallocated
+  matrices of different dimensions, of course remembering to zero them.
+
+- One could cache the result of count_loops(), as well.

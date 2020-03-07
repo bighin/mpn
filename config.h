@@ -10,6 +10,7 @@ struct configuration_t
 	char *prefix;
 	bool progressbar;
 	char *erisfile;
+	bool seedrng;
 
 	/* "parameters" section */
 
