@@ -3,6 +3,8 @@
 
 #include <gsl/gsl_rng.h>
 
+#include "loaderis.h"
+
 #define IMATRIX_MAX_DIMENSIONS	(512)
 
 struct pmatrix_t
@@ -27,8 +29,8 @@ int pmatrix_sum_row(struct pmatrix_t *pmx, int row);
 int pmatrix_sum_column(struct pmatrix_t *pmx, int column);
 int pmatrix_trace(struct pmatrix_t *pmx);
 
-int pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj);
-int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj);
+double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx);
+double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx);
 
 void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx);
 void pmatrix_swap_cols(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx);

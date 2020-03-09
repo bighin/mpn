@@ -126,15 +126,99 @@ int pmatrix_trace(struct pmatrix_t *pmx)
 	return ret;
 }
 
-int pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj)
+double amatrix_estimate_entry(struct amatrix_t *amx,int i,int j)
+{
+	struct
+	{
+		int value,qtype;
+	}
+	slots[4];
+
+	int islots=0;
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	slots[0].value=slots[1].value=slots[2].value=slots[3].value=0;
+	for(int iprime=0;iprime<dimensions;iprime++)
+	{
+		int entry;
+
+		if((entry=pmatrix_get_entry(amx->pmxs[0],iprime,j))!=0)
+		{
+			assert((islots==0)||(islots==1));
+			slots[islots++].value=entry;
+			slots[islots++].qtype=pmatrix_entry_type(iprime,j);
+		}
+
+		if((entry=pmatrix_get_entry(amx->pmxs[1],iprime,j))!=0)
+		{
+			assert((islots==0)||(islots==1));
+			slots[islots++].value=entry;
+			slots[islots++].qtype=pmatrix_entry_type(iprime,j);
+		}
+	}
+
+	assert(islots==2);
+
+	for(int jprime=0;jprime<dimensions;jprime++)
+	{
+		int entry;
+
+		if((entry=pmatrix_get_entry(amx->pmxs[0],i,jprime))!=0)
+		{
+			assert((islots==2)||(islots==3));
+			slots[islots++].value=entry;
+			slots[islots++].qtype=pmatrix_entry_type(i,jprime);
+		}
+
+		if((entry=pmatrix_get_entry(amx->pmxs[1],i,jprime))!=0)
+		{
+			assert((islots==2)||(islots==3));
+			slots[islots++].value=entry;
+			slots[islots++].qtype=pmatrix_entry_type(i,jprime);
+		}
+	}
+
+	assert(islots==4);
+
+	int i1,i2,i3,i4;
+
+	i1=slots[0].value-1+((slots[0].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
+	i2=slots[1].value-1+((slots[1].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
+	i3=slots[2].value-1+((slots[2].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
+	i4=slots[3].value-1+((slots[3].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
+
+	return get_eri(amx->ectx, i1, i2, i3, i4);
+}
+
+int pmatrix_get_new_occupied_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists)
+{
+	double selector=gsl_rng_uniform(rngctx);
+
+	for(int c=0;c<pmx->nr_occupied;c++)
+		if(cdists[c]>=selector)
+			return 1+c;
+
+	return 1+pmx->nr_occupied;
+}
+
+int pmatrix_get_new_virtual_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists)
+{
+	double selector=gsl_rng_uniform(rngctx);
+
+	for(int c=0;c<pmx->nr_virtual;c++)
+		if(cdists[c]>=selector)
+			return 1+c;
+
+	return 1+pmx->nr_virtual;
+}
+
+double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx)
 {
 	int selector=gsl_rng_uniform_int(rngctx, pmx->dimensions+1);
 
 	assert(selector>=0);
 	assert(selector<(pmx->dimensions+1));
-
-	if(pmx->dimensions>=IMATRIX_MAX_DIMENSIONS)
-		return -1;
+	assert(pmx->dimensions<IMATRIX_MAX_DIMENSIONS);
 
 	/*
 		There are (dims+1) ways of extending a matrix:
@@ -153,9 +237,6 @@ int pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *ta
 	        | 1 0 0 | --> | 1 0 0 0 |
  	        | 0 1 0 |     | 0 1 0 0 |
         		      | 0 0 0 1 |
-
-		In case we take the a) option we return 1 and we save the coordinates of the projected
-		entry in (targeti,targetj). Otherwise we return 2 and (targeti,targetj) is left untouched.
 	*/
 
 	if(selector<pmx->dimensions)
@@ -202,26 +283,47 @@ int pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *ta
 		int newvalues[2];
 
 		if(pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))
+		{
 			newvalues[0]=pmatrix_get_entry(pmx, i, j);
+		}
 		else
-			newvalues[0]=pmatrix_get_new_value(pmx, rngctx, i, pmx->dimensions-1);
+		{
+			double *cdists=malloc(sizeof(double)*pmx->nr_occupied);
+
+			for(int c=0;c<pmx->nr_occupied;c++)
+				cdists[c]=((double)(c+1))/pmx->nr_occupied;
+
+			assert(pmatrix_entry_type(i, pmx->dimensions-1)==QTYPE_OCCUPIED);
+			newvalues[0]=pmatrix_get_new_occupied_value_cdists(pmx, rngctx, cdists);
+
+			free(cdists);
+		}
 
 		if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
+		{
 			newvalues[1]=pmatrix_get_entry(pmx, i, j);
+		}
 		else
-			newvalues[1]=pmatrix_get_new_value(pmx, rngctx, pmx->dimensions-1, j);
+		{
+			double *cdists=malloc(sizeof(double)*pmx->nr_virtual);
+
+			for(int c=0;c<pmx->nr_virtual;c++)
+				cdists[c]=((double)(c+1))/pmx->nr_virtual;
+
+			assert(pmatrix_entry_type(pmx->dimensions-1, j)==QTYPE_VIRTUAL);
+			newvalues[1]=pmatrix_get_new_virtual_value_cdists(pmx, rngctx, cdists);
+
+			free(cdists);
+		}
 
 		assert((pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))!=
-			       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
+		       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
 
 		pmatrix_set_entry(pmx, i, pmx->dimensions-1, newvalues[0]);
 		pmatrix_set_entry(pmx, pmx->dimensions-1, j, newvalues[1]);
 		pmatrix_set_entry(pmx, i, j, 0);
 
-		*targeti=i;
-		*targetj=j;
-
-		return 1;
+		return pmx->dimensions*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(ectx->nvirt):(ectx->nocc));
 	}
 	else if(selector==pmx->dimensions)
 	{
@@ -248,17 +350,16 @@ int pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *ta
 		int newvalue=pmatrix_get_new_value(pmx, rngctx, pmx->dimensions-1, pmx->dimensions-1);
 		pmatrix_set_entry(pmx, pmx->dimensions-1, pmx->dimensions-1, newvalue);
 
-		return 2;
+		return pmx->dimensions*ectx->nocc;
 	}
 
 	assert(false);
-	return -1;
+	return 0.0f;
 }
 
-int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj)
+double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx)
 {
-	if(pmx->dimensions<=1)
-		return -1;
+	assert(pmx->dimensions>1);
 
 	int i,j;
 
@@ -299,8 +400,7 @@ int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *t
 	/*
 		Finally we can squeeze the matrix.
 
-		In case the element to remove is in the bottom right corner,
-		we return 2 and (targeti,targetj) is left untouched...
+		Case b): the element to remove is in the bottom right corner.
 	*/
 
 	if(i==(pmx->dimensions-1))
@@ -310,14 +410,12 @@ int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *t
 
 		pmx->dimensions--;
 
-		return 2;
+		return 1.0f/((pmx->dimensions+1)*ectx->nocc);
 	}
 
 	/*
-		...otherwise two different entries on the last row and column are being
-		removed, and a new entry is added to the matrix.
-
-		We return 1 and we save the coordinates of this new entry in (targeti,targetj).
+		...otherwise we have case a) two different entries on the last row
+		and column are being removed, and a new entry is added to the matrix.
 	*/
 
 	assert(pmatrix_get_entry(pmx, i, pmx->dimensions-1)!=0);
@@ -339,10 +437,7 @@ int pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *t
 
 	pmx->dimensions--;
 
-	*targeti=i;
-	*targetj=j;
-
-	return 1;
+	return 1.0f/((pmx->dimensions+1)*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(ectx->nvirt):(ectx->nocc)));
 }
 
 void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx)

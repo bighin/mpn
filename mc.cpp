@@ -38,42 +38,8 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	int dimensions=amx->pmxs[0]->dimensions;
-	int i,j;
-
-	switch(pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i, &j))
-	{
-		case 1:
-		probability*=((dimensions+1)*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_virtual):(amx->nr_occupied)));
-		break;
-
-		case 2:
-		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
-		probability*=((dimensions+1)*amx->nr_occupied);
-		break;
-
-		case -1:
-		default:
-		assert(false);
-		return UPDATE_ERROR;
-	}
-
-	switch(pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i, &j))
-	{
-		case 1:
-		probability*=((dimensions+1)*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_virtual):(amx->nr_occupied)));
-		break;
-
-		case 2:
-		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
-		probability*=((dimensions+1)*amx->nr_occupied);
-		break;
-
-		case -1:
-		default:
-		assert(false);
-		return UPDATE_ERROR;
-	}
+	probability*=pmatrix_extend(amx->pmxs[0], amx->rng_ctx, amx->ectx);
+	probability*=pmatrix_extend(amx->pmxs[1], amx->rng_ctx, amx->ectx);
 
 	amx->cached_weight_is_valid=false;
 
@@ -108,42 +74,8 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	int dimensions=amx->pmxs[0]->dimensions;
-	int i,j;
-
-	switch(pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx, &i, &j))
-	{
-		case 1:
-		probability/=(dimensions*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_virtual):(amx->nr_occupied)));
-		break;
-
-		case 2:
-		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
-		probability/=(dimensions*amx->nr_occupied);
-		break;
-
-		case -1:
-		default:
-		assert(false);
-		return UPDATE_ERROR;
-	}
-
-	switch(pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx, &i, &j))
-	{
-		case 1:
-		probability/=(dimensions*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(amx->nr_virtual):(amx->nr_occupied)));
-		break;
-
-		case 2:
-		assert(pmatrix_entry_type(dimensions,dimensions)==QTYPE_OCCUPIED);
-		probability/=(dimensions*amx->nr_occupied);
-		break;
-
-		case -1:
-		default:
-		assert(false);
-		return UPDATE_ERROR;
-	}
+	probability*=pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx, amx->ectx);
+	probability*=pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx, amx->ectx);
 
 	amx->cached_weight_is_valid=false;
 
