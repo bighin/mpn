@@ -126,92 +126,6 @@ int pmatrix_trace(struct pmatrix_t *pmx)
 	return ret;
 }
 
-double amatrix_estimate_entry(struct amatrix_t *amx,int i,int j)
-{
-	struct
-	{
-		int value,qtype;
-	}
-	slots[4];
-
-	int islots=0;
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	slots[0].value=slots[1].value=slots[2].value=slots[3].value=0;
-	for(int iprime=0;iprime<dimensions;iprime++)
-	{
-		int entry;
-
-		if((entry=pmatrix_get_entry(amx->pmxs[0],iprime,j))!=0)
-		{
-			assert((islots==0)||(islots==1));
-			slots[islots++].value=entry;
-			slots[islots++].qtype=pmatrix_entry_type(iprime,j);
-		}
-
-		if((entry=pmatrix_get_entry(amx->pmxs[1],iprime,j))!=0)
-		{
-			assert((islots==0)||(islots==1));
-			slots[islots++].value=entry;
-			slots[islots++].qtype=pmatrix_entry_type(iprime,j);
-		}
-	}
-
-	assert(islots==2);
-
-	for(int jprime=0;jprime<dimensions;jprime++)
-	{
-		int entry;
-
-		if((entry=pmatrix_get_entry(amx->pmxs[0],i,jprime))!=0)
-		{
-			assert((islots==2)||(islots==3));
-			slots[islots++].value=entry;
-			slots[islots++].qtype=pmatrix_entry_type(i,jprime);
-		}
-
-		if((entry=pmatrix_get_entry(amx->pmxs[1],i,jprime))!=0)
-		{
-			assert((islots==2)||(islots==3));
-			slots[islots++].value=entry;
-			slots[islots++].qtype=pmatrix_entry_type(i,jprime);
-		}
-	}
-
-	assert(islots==4);
-
-	int i1,i2,i3,i4;
-
-	i1=slots[0].value-1+((slots[0].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
-	i2=slots[1].value-1+((slots[1].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
-	i3=slots[2].value-1+((slots[2].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
-	i4=slots[3].value-1+((slots[3].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
-
-	return get_eri(amx->ectx, i1, i2, i3, i4);
-}
-
-int pmatrix_get_new_occupied_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists)
-{
-	double selector=gsl_rng_uniform(rngctx);
-
-	for(int c=0;c<pmx->nr_occupied;c++)
-		if(cdists[c]>=selector)
-			return 1+c;
-
-	return 1+pmx->nr_occupied;
-}
-
-int pmatrix_get_new_virtual_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists)
-{
-	double selector=gsl_rng_uniform(rngctx);
-
-	for(int c=0;c<pmx->nr_virtual;c++)
-		if(cdists[c]>=selector)
-			return 1+c;
-
-	return 1+pmx->nr_virtual;
-}
-
 double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx)
 {
 	int selector=gsl_rng_uniform_int(rngctx, pmx->dimensions+1);
@@ -283,38 +197,14 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 		int newvalues[2];
 
 		if(pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))
-		{
 			newvalues[0]=pmatrix_get_entry(pmx, i, j);
-		}
 		else
-		{
-			double *cdists=malloc(sizeof(double)*pmx->nr_occupied);
-
-			for(int c=0;c<pmx->nr_occupied;c++)
-				cdists[c]=((double)(c+1))/pmx->nr_occupied;
-
-			assert(pmatrix_entry_type(i, pmx->dimensions-1)==QTYPE_OCCUPIED);
-			newvalues[0]=pmatrix_get_new_occupied_value_cdists(pmx, rngctx, cdists);
-
-			free(cdists);
-		}
+			newvalues[0]=pmatrix_get_new_value(pmx, rngctx, i, pmx->dimensions-1);
 
 		if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
-		{
 			newvalues[1]=pmatrix_get_entry(pmx, i, j);
-		}
 		else
-		{
-			double *cdists=malloc(sizeof(double)*pmx->nr_virtual);
-
-			for(int c=0;c<pmx->nr_virtual;c++)
-				cdists[c]=((double)(c+1))/pmx->nr_virtual;
-
-			assert(pmatrix_entry_type(pmx->dimensions-1, j)==QTYPE_VIRTUAL);
-			newvalues[1]=pmatrix_get_new_virtual_value_cdists(pmx, rngctx, cdists);
-
-			free(cdists);
-		}
+			newvalues[1]=pmatrix_get_new_value(pmx, rngctx, pmx->dimensions-1, j);
 
 		assert((pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))!=
 		       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
