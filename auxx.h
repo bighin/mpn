@@ -28,4 +28,7 @@ void print_file_size(FILE *out,int size);
 
 char *find_and_replace(const char *src,const char *from,const char *to);
 
+void normalize_distribution(double *dists, int nrstates);
+void to_cumulative_distribution(const double *dists, double *cdists, int nrstates);
+
 #endif //__AUXX_H__

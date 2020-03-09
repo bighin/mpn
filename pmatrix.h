@@ -39,8 +39,10 @@ bool pmatrix_check_consistency(struct pmatrix_t *pmx);
 
 int pmatrix_entry_type(int i,int j);
 
-int pmatrix_get_new_occupied_value(struct pmatrix_t *pmx, gsl_rng *rngctx);
-int pmatrix_get_new_virtual_value(struct pmatrix_t *pmx, gsl_rng *rngctx);
-int pmatrix_get_new_value(struct pmatrix_t *pmx, gsl_rng *rngctx, int i, int j);
+int pmatrix_get_new_occupied_value_uniform(struct pmatrix_t *pmx, gsl_rng *rngctx);
+int pmatrix_get_new_virtual_value_uniform(struct pmatrix_t *pmx, gsl_rng *rngctx);
+int pmatrix_get_new_value_uniform(struct pmatrix_t *pmx, gsl_rng *rngctx, int i, int j);
+
+int pmatrix_get_new_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists, int nrstates, int *chosen);
 
 #endif //__PMATRIX_H__
