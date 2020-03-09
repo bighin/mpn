@@ -2,9 +2,7 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <assert.h>
-
 #include <gsl/gsl_rng.h>
-#include <gsl/gsl_math.h>
 
 #include "pmatrix.h"
 #include "mpn.h"
@@ -200,8 +198,7 @@ int pmatrix_get_new_occupied_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx
 		if(cdists[c]>=selector)
 			return 1+c;
 
-	assert(false);
-	return 1+(pmx->nr_occupied-1);
+	return 1+pmx->nr_occupied;
 }
 
 int pmatrix_get_new_virtual_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists)
@@ -212,48 +209,7 @@ int pmatrix_get_new_virtual_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx,
 		if(cdists[c]>=selector)
 			return 1+c;
 
-	assert(false);
-	return 1+(pmx->nr_virtual-1);
-}
-
-int pmatrix_get_new_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists, int nrstates, int *chosen)
-{
-	double selector=gsl_rng_uniform(rngctx);
-
-	for(int c=0;c<nrstates;c++)
-	{
-		if(cdists[c]>=selector)
-		{
-			*chosen=c;
-			return 1+c;
-		}
-	}
-
-	assert(false);
-	*chosen=(nrstates-1);
-	return 1+(nrstates-1);
-}
-
-void normalize(double *dists,int nrstates)
-{
-	double total=0.0f;
-
-	for(int c=0;c<nrstates;c++)
-		total+=dists[c];
-
-	for(int c=0;c<nrstates;c++)
-		dists[c]/=total;
-}
-
-void cumulative(const double *dists, double *cdists, int nrstates)
-{
-	cdists[0]=dists[0];
-
-	for(int c=1;c<nrstates;c++)
-		cdists[c]=dists[c]+cdists[c-1];
-
-	assert(gsl_fcmp(cdists[nrstates-1], 1.0, 1e-8)==0);
-	cdists[nrstates-1]=1.0f;
+	return 1+pmx->nr_virtual;
 }
 
 double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx)
@@ -324,54 +280,50 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 			Finally we set the two new values.
 		*/
 
-		int targeti=-1,targetj=-1;
+		int newvalues[2];
 
 		if(pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))
 		{
-			pmatrix_set_entry(pmx, i, pmx->dimensions-1, pmatrix_get_entry(pmx, i, j));
+			newvalues[0]=pmatrix_get_entry(pmx, i, j);
 		}
 		else
 		{
-			targeti=i;
-			targetj=pmx->dimensions-1;
+			double *cdists=malloc(sizeof(double)*pmx->nr_occupied);
+
+			for(int c=0;c<pmx->nr_occupied;c++)
+				cdists[c]=((double)(c+1))/pmx->nr_occupied;
+
+			assert(pmatrix_entry_type(i, pmx->dimensions-1)==QTYPE_OCCUPIED);
+			newvalues[0]=pmatrix_get_new_occupied_value_cdists(pmx, rngctx, cdists);
+
+			free(cdists);
 		}
 
 		if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
 		{
-			pmatrix_set_entry(pmx, pmx->dimensions-1, j, pmatrix_get_entry(pmx, i, j));
+			newvalues[1]=pmatrix_get_entry(pmx, i, j);
 		}
 		else
 		{
-			targeti=pmx->dimensions-1;
-			targetj=j;
+			double *cdists=malloc(sizeof(double)*pmx->nr_virtual);
+
+			for(int c=0;c<pmx->nr_virtual;c++)
+				cdists[c]=((double)(c+1))/pmx->nr_virtual;
+
+			assert(pmatrix_entry_type(pmx->dimensions-1, j)==QTYPE_VIRTUAL);
+			newvalues[1]=pmatrix_get_new_virtual_value_cdists(pmx, rngctx, cdists);
+
+			free(cdists);
 		}
 
+		assert((pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))!=
+		       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
+
+		pmatrix_set_entry(pmx, i, pmx->dimensions-1, newvalues[0]);
+		pmatrix_set_entry(pmx, pmx->dimensions-1, j, newvalues[1]);
 		pmatrix_set_entry(pmx, i, j, 0);
 
-		assert((targeti!=-1)&&(targetj!=-1));
-		assert((pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))!=
-			       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
-
-		int nr_states=(pmatrix_entry_type(targeti,targetj)==QTYPE_VIRTUAL)?(pmx->nr_virtual):(pmx->nr_occupied);
-		double probability;
-		int chosen;
-
-		double *dists=malloc(sizeof(double)*nr_states);
-		double *cdists=malloc(sizeof(double)*nr_states);
-
-		for(int c=0;c<nr_states;c++)
-			dists[c]=1.0;
-
-		normalize(dists, nr_states);
-		cumulative(dists, cdists, nr_states);
-
-		pmatrix_set_entry(pmx, targeti, targetj, pmatrix_get_new_value_cdists(pmx, rngctx, cdists, nr_states, &chosen));
-		probability=1.0f/dists[chosen];
-
-		free(cdists);
-		free(dists);
-
-		return pmx->dimensions*probability;
+		return pmx->dimensions*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(ectx->nvirt):(ectx->nocc));
 	}
 	else if(selector==pmx->dimensions)
 	{
@@ -469,36 +421,14 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_c
 	assert(pmatrix_get_entry(pmx, i, pmx->dimensions-1)!=0);
 	assert(pmatrix_get_entry(pmx, pmx->dimensions-1, j)!=0);
 
-	int targeti=-1,targetj=-1;
 	int newvalue=-1;
 
 	if(pmatrix_entry_type(i, pmx->dimensions-1)==pmatrix_entry_type(i,j))
-	{
 		newvalue=pmatrix_get_entry(pmx, i, pmx->dimensions-1);
-		targeti=pmx->dimensions-1;
-		targetj=j;
-	}
 	else if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
-	{
 		newvalue=pmatrix_get_entry(pmx, pmx->dimensions-1, j);
-		targeti=i;
-		targetj=pmx->dimensions-1;
-	}
 
 	assert(newvalue!=-1);
-	assert((targeti!=-1)&&(targetj!=-1));
-
-	int nr_states=(pmatrix_entry_type(targeti,targetj)==QTYPE_VIRTUAL)?(pmx->nr_virtual):(pmx->nr_occupied);
-	double *dists=malloc(sizeof(double)*nr_states);
-	double probability;
-
-	for(int c=0;c<nr_states;c++)
-		dists[c]=1.0;
-
-	normalize(dists, nr_states);
-	probability=1.0f/dists[pmatrix_get_entry(pmx,targeti,targetj)-1];
-
-	free(dists);
 
 	pmatrix_set_entry(pmx, i, pmx->dimensions-1, 0);
 	pmatrix_set_entry(pmx, pmx->dimensions-1, j, 0);
@@ -507,7 +437,7 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_c
 
 	pmx->dimensions--;
 
-	return 1.0f/((pmx->dimensions+1)*probability);
+	return 1.0f/((pmx->dimensions+1)*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(ectx->nvirt):(ectx->nocc)));
 }
 
 void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx)
