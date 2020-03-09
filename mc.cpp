@@ -203,8 +203,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 
 		for(int j=0;j<dimensions;j++)
 			if(pmatrix_get_entry(target, i, j)!=0)
-				pmatrix_set_entry(target, i, j,
-						  pmatrix_get_new_value_uniform(target, amx->rng_ctx, i, j));
+				pmatrix_set_entry(target, i, j, pmatrix_get_new_value(target, amx->rng_ctx, i, j));
 	}
 
 	amx->cached_weight_is_valid=false;

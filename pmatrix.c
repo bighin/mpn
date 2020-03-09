@@ -4,6 +4,7 @@
 #include <assert.h>
 
 #include <gsl/gsl_rng.h>
+#include <gsl/gsl_math.h>
 
 #include "pmatrix.h"
 #include "mpn.h"
@@ -19,8 +20,8 @@ struct pmatrix_t *init_pmatrix(int nr_occupied,int nr_virtual,gsl_rng *rngctx)
 	ret->nr_occupied=nr_occupied;
 	ret->nr_virtual=nr_virtual;
 
-	ret->values[0][0]=pmatrix_get_new_value_uniform(ret, rngctx, 0, 0);
-	ret->values[1][1]=pmatrix_get_new_value_uniform(ret, rngctx, 1, 1);
+	ret->values[0][0]=pmatrix_get_new_value(ret, rngctx, 0, 0);
+	ret->values[1][1]=pmatrix_get_new_value(ret, rngctx, 1, 1);
 
 	return ret;
 }
@@ -191,6 +192,70 @@ double amatrix_estimate_entry(struct amatrix_t *amx,int i,int j)
 	return get_eri(amx->ectx, i1, i2, i3, i4);
 }
 
+int pmatrix_get_new_occupied_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists)
+{
+	double selector=gsl_rng_uniform(rngctx);
+
+	for(int c=0;c<pmx->nr_occupied;c++)
+		if(cdists[c]>=selector)
+			return 1+c;
+
+	assert(false);
+	return 1+(pmx->nr_occupied-1);
+}
+
+int pmatrix_get_new_virtual_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists)
+{
+	double selector=gsl_rng_uniform(rngctx);
+
+	for(int c=0;c<pmx->nr_virtual;c++)
+		if(cdists[c]>=selector)
+			return 1+c;
+
+	assert(false);
+	return 1+(pmx->nr_virtual-1);
+}
+
+int pmatrix_get_new_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists, int nrstates, int *chosen)
+{
+	double selector=gsl_rng_uniform(rngctx);
+
+	for(int c=0;c<nrstates;c++)
+	{
+		if(cdists[c]>=selector)
+		{
+			*chosen=c;
+			return 1+c;
+		}
+	}
+
+	assert(false);
+	*chosen=(nrstates-1);
+	return 1+(nrstates-1);
+}
+
+void normalize(double *dists,int nrstates)
+{
+	double total=0.0f;
+
+	for(int c=0;c<nrstates;c++)
+		total+=dists[c];
+
+	for(int c=0;c<nrstates;c++)
+		dists[c]/=total;
+}
+
+void cumulative(const double *dists, double *cdists, int nrstates)
+{
+	cdists[0]=dists[0];
+
+	for(int c=1;c<nrstates;c++)
+		cdists[c]=dists[c]+cdists[c-1];
+
+	assert(gsl_fcmp(cdists[nrstates-1], 1.0, 1e-8)==0);
+	cdists[nrstates-1]=1.0f;
+}
+
 double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx)
 {
 	int selector=gsl_rng_uniform_int(rngctx, pmx->dimensions+1);
@@ -256,10 +321,7 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 			assert(pmatrix_get_entry(pmx, i2, j)==0);
 
 		/*
-			Finally we need to set the two new entries:
-
-			- One value (whose type coincides with the entry initially selected) is set straight away.
-			- The other value (of different type) will be sampled for an appropriate distribution.
+			Finally we set the two new values.
 		*/
 
 		int targeti=-1,targetj=-1;
@@ -267,7 +329,6 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 		if(pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))
 		{
 			pmatrix_set_entry(pmx, i, pmx->dimensions-1, pmatrix_get_entry(pmx, i, j));
-			pmatrix_set_entry(pmx, i, j, 0);
 		}
 		else
 		{
@@ -278,7 +339,6 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 		if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
 		{
 			pmatrix_set_entry(pmx, pmx->dimensions-1, j, pmatrix_get_entry(pmx, i, j));
-			pmatrix_set_entry(pmx, i, j, 0);
 		}
 		else
 		{
@@ -286,14 +346,11 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 			targetj=j;
 		}
 
+		pmatrix_set_entry(pmx, i, j, 0);
+
 		assert((targeti!=-1)&&(targetj!=-1));
 		assert((pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))!=
-		       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
-
-		/*
-			Now (targeti, targetj) contains the coordinate of the last missing entry, whose value
-			needs to be sampled from an appropriate distribution.
-		*/
+			       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
 
 		int nr_states=(pmatrix_entry_type(targeti,targetj)==QTYPE_VIRTUAL)?(pmx->nr_virtual):(pmx->nr_occupied);
 		double probability;
@@ -305,8 +362,8 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 		for(int c=0;c<nr_states;c++)
 			dists[c]=1.0;
 
-		normalize_distribution(dists, nr_states);
-		to_cumulative_distribution(dists, cdists, nr_states);
+		normalize(dists, nr_states);
+		cumulative(dists, cdists, nr_states);
 
 		pmatrix_set_entry(pmx, targeti, targetj, pmatrix_get_new_value_cdists(pmx, rngctx, cdists, nr_states, &chosen));
 		probability=1.0f/dists[chosen];
@@ -335,10 +392,10 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 		}
 
 		/*
-			We just add the new element in the corner, sampled from a uniform distribution
+			We just add the new element in the corner
 		*/
 
-		int newvalue=pmatrix_get_new_value_uniform(pmx, rngctx, pmx->dimensions-1, pmx->dimensions-1);
+		int newvalue=pmatrix_get_new_value(pmx, rngctx, pmx->dimensions-1, pmx->dimensions-1);
 		pmatrix_set_entry(pmx, pmx->dimensions-1, pmx->dimensions-1, newvalue);
 
 		return pmx->dimensions*ectx->nocc;
@@ -431,11 +488,6 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_c
 	assert(newvalue!=-1);
 	assert((targeti!=-1)&&(targetj!=-1));
 
-	/*
-		In order to return the correct probability, we need to reconstruct the distribution
-		from which the entry (targeti, targetj) was sampled in the symmetric update.
-	*/
-
 	int nr_states=(pmatrix_entry_type(targeti,targetj)==QTYPE_VIRTUAL)?(pmx->nr_virtual):(pmx->nr_occupied);
 	double *dists=malloc(sizeof(double)*nr_states);
 	double probability;
@@ -443,15 +495,10 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_c
 	for(int c=0;c<nr_states;c++)
 		dists[c]=1.0;
 
-	normalize_distribution(dists, nr_states);
+	normalize(dists, nr_states);
 	probability=1.0f/dists[pmatrix_get_entry(pmx,targeti,targetj)-1];
 
 	free(dists);
-
-	/*
-		Finally, we clean up the removed entries, we set the correct value on the entry
-		we are creating, we adjust the matrix dimensions and we return the probability.
-	*/
 
 	pmatrix_set_entry(pmx, i, pmx->dimensions-1, 0);
 	pmatrix_set_entry(pmx, pmx->dimensions-1, j, 0);
@@ -504,14 +551,14 @@ void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int
 			*/
 
 			if((pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL))
-				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value_uniform(pmx, rngctx, i2, j));
+				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value(pmx, rngctx, i2, j));
 
 			/*
 				Going from virtual to occupied
 			*/
 
 			if((pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED))
-				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value_uniform(pmx, rngctx, i2, j));
+				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value(pmx, rngctx, i2, j));
 
 #ifndef NDEBUG
 			if((pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL)) x2++;
@@ -549,14 +596,14 @@ void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int
 			*/
 
 			if((pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL))
-				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value_uniform(pmx, rngctx, i1, j));
+				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value(pmx, rngctx, i1, j));
 
 			/*
 				Going from virtual to occupied
 			*/
 
 			if((pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED))
-				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value_uniform(pmx, rngctx, i1, j));
+				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value(pmx, rngctx, i1, j));
 
 #ifndef NDEBUG
 			if((pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL)) x2++;
@@ -631,14 +678,14 @@ void pmatrix_swap_cols(struct pmatrix_t *pmx, int j1, int j2, int update[2], int
 			*/
 
 			if((pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL))
-				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value_uniform(pmx, rngctx, i, j2));
+				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value(pmx, rngctx, i, j2));
 
 			/*
 				Going from virtual to occupied
 			*/
 
 			if((pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED))
-				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value_uniform(pmx, rngctx, i, j2));
+				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value(pmx, rngctx, i, j2));
 
 #ifndef NDEBUG
 			if((pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL)) x2++;
@@ -672,14 +719,14 @@ void pmatrix_swap_cols(struct pmatrix_t *pmx, int j1, int j2, int update[2], int
 			*/
 
 			if((pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL))
-				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value_uniform(pmx, rngctx, i, j1));
+				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value(pmx, rngctx, i, j1));
 
 			/*
 				Going from virtual to occupied
 			*/
 
 			if((pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED))
-				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value_uniform(pmx, rngctx, i, j1));
+				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value(pmx, rngctx, i, j1));
 
 #ifndef NDEBUG
 			if((pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL)) x2++;
@@ -771,47 +818,20 @@ int pmatrix_entry_type(int i,int j)
 	return QTYPE_VIRTUAL;
 }
 
-/*
-	The following three functions return a new value for a pmatrix entry,
-	sampling from a uniform distribution.
-*/
-
-int pmatrix_get_new_occupied_value_uniform(struct pmatrix_t *pmx, gsl_rng *rngctx)
+int pmatrix_get_new_occupied_value(struct pmatrix_t *pmx, gsl_rng *rngctx)
 {
 	return 1+gsl_rng_uniform_int(rngctx, pmx->nr_occupied);
 }
 
-int pmatrix_get_new_virtual_value_uniform(struct pmatrix_t *pmx, gsl_rng *rngctx)
+int pmatrix_get_new_virtual_value(struct pmatrix_t *pmx, gsl_rng *rngctx)
 {
 	return 1+gsl_rng_uniform_int(rngctx, pmx->nr_virtual);
 }
 
-int pmatrix_get_new_value_uniform(struct pmatrix_t *pmx, gsl_rng *rngctx, int i, int j)
+int pmatrix_get_new_value(struct pmatrix_t *pmx, gsl_rng *rngctx, int i, int j)
 {
 	if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
-		return pmatrix_get_new_occupied_value_uniform(pmx, rngctx);
+		return pmatrix_get_new_occupied_value(pmx, rngctx);
 
-	return pmatrix_get_new_virtual_value_uniform(pmx, rngctx);
-}
-
-/*
-	The following function returns a new value sampling from a given (cumulative) distribution,
-*/
-
-int pmatrix_get_new_value_cdists(struct pmatrix_t *pmx, gsl_rng *rngctx, const double *cdists, int nrstates, int *chosen)
-{
-	double selector=gsl_rng_uniform(rngctx);
-
-	for(int c=0;c<nrstates;c++)
-	{
-		if(cdists[c]>=selector)
-		{
-			*chosen=c;
-			return 1+c;
-		}
-	}
-
-	assert(false);
-	*chosen=(nrstates-1);
-	return 1+(nrstates-1);
+	return pmatrix_get_new_virtual_value(pmx, rngctx);
 }
