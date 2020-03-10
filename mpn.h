@@ -6,7 +6,6 @@
 #include <gsl/gsl_matrix.h>
 
 #include "loaderis.h"
-#include "amatrix.h"
 
 struct label_t
 {
@@ -30,6 +29,10 @@ struct label_t
 #define MAX_LABELS		(512)
 #define MAX_MATRIX_ELEMENTS	(512)
 
+struct amatrix_t;
+struct amatrix_weight_t;
+
+double reconstruct_weight(struct amatrix_weight_t *awt,struct energies_ctx_t *ectx);
 struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx);
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels);
 

@@ -27,9 +27,29 @@ extern "C" {
 	The updates
 */
 
-double extend_pdf(struct amatrix_t *amx, int i1, int j1, int value1, int i2, int j2, int value2)
+double extend_pdf(struct amatrix_t *amx, struct amatrix_weight_t *w, int label1, int value1, int label2, int value2)
 {
+	int backup1=w->labels[label1].value;
+	int backup2=w->labels[label2].value;
+
+	double ret=fabs(reconstruct_weight(w,amx->ectx));
+
+	w->labels[label1].value=backup1;
+	w->labels[label2].value=backup2;
+
 	return 1.0f;
+}
+
+int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j)
+{
+	for(int c=0;c<ilabels;c++)
+	{
+		if((labels[c].i==i)&&(labels[c].j==j))
+			return c;
+	}
+
+	assert(false);
+	return 0;
 }
 
 int update_extend(struct amatrix_t *amx, bool always_accept)
@@ -47,6 +67,11 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 	probability*=pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i1, &j1);
 	probability*=pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i2, &j2);
+
+	struct amatrix_weight_t w=amatrix_weight(amx);
+
+	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1);
+	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2);
 
 	/*
 		Now we have to select the two missing values from a suitable distribution, that
@@ -75,7 +100,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 		{
 			int index=c+d*nr_states1;
 
-			dists[index]=extend_pdf(amx, i1, j1, 1+c, i2, j2, 1+d);
+			dists[index]=extend_pdf(amx, &w, label1, 1+c, label2, 1+d);
 		}
 	}
 
@@ -197,6 +222,11 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 
 	assert((i1!=-1)&&(j1!=-1)&&(i2!=-1)&&(j2!=-1));
 
+	struct amatrix_weight_t w=amatrix_weight(amx);
+
+	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1);
+	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2);
+
 	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
 	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
 
@@ -208,7 +238,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 		{
 			int index=c+d*nr_states1;
 
-			dists[index]=extend_pdf(amx, i1, j1, 1+c, i2, j2, 1+d);
+			dists[index]=extend_pdf(amx, &w, label1, 1+c, label2, 1+d);
 		}
 	}
 

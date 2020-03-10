@@ -97,7 +97,7 @@ void add_unphysical_penalty(struct amatrix_weight_t *awt,double penalty)
 	awt->unphysical_penalty*=penalty;
 }
 
-double reconstruct_weight(struct amatrix_weight_t *awt,struct label_t *labels,struct energies_ctx_t *ectx)
+double reconstruct_weight(struct amatrix_weight_t *awt,struct energies_ctx_t *ectx)
 {
 	double denominators=1.0f;
 
@@ -114,11 +114,11 @@ double reconstruct_weight(struct amatrix_weight_t *awt,struct label_t *labels,st
 			switch(awt->denominators[c].qtypes[d])
 			{
 				case QTYPE_OCCUPIED:
-				denominator+=get_occupied_energy(ectx, labels[label].value-1);
+				denominator+=get_occupied_energy(ectx, awt->labels[label].value-1);
 				break;
 
 				case QTYPE_VIRTUAL:
-				denominator-=get_virtual_energy(ectx, labels[label].value-1);
+				denominator-=get_virtual_energy(ectx, awt->labels[label].value-1);
 				break;
 			}
 		}
@@ -139,10 +139,10 @@ double reconstruct_weight(struct amatrix_weight_t *awt,struct label_t *labels,st
 
 		int i1,i2,i3,i4;
 
-		i1=labels[l1].value-1+((labels[l1].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
-		i2=labels[l2].value-1+((labels[l2].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
-		i3=labels[l3].value-1+((labels[l3].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
-		i4=labels[l4].value-1+((labels[l4].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+		i1=awt->labels[l1].value-1+((awt->labels[l1].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+		i2=awt->labels[l2].value-1+((awt->labels[l2].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+		i3=awt->labels[l3].value-1+((awt->labels[l3].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+		i4=awt->labels[l4].value-1+((awt->labels[l4].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
 
 		numerators*=get_eri(ectx, i1, i2, i3, i4);
 	}
@@ -396,7 +396,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	ret.inversefactor=inversefactor;
 
 	if(fabs(ret.weight)>1e-4)
-		assert(gsl_fcmp(ret.weight,reconstruct_weight(&ret,labels,amx->ectx),1e-8)==0);
+		assert(gsl_fcmp(ret.weight,reconstruct_weight(&ret,amx->ectx),1e-8)==0);
 
 	return ret;
 }

@@ -7,6 +7,7 @@
 #include "pmatrix.h"
 #include "loaderis.h"
 #include "config.h"
+#include "mpn.h"
 
 /*
 	This structure saves the result of the evaluation of the weight of a matrix,
@@ -34,16 +35,21 @@ struct amatrix_weight_t
 		int qtypes[32];
 		int ilabels;
 	}
-	denominators[512];
+	denominators[16];
 
 	int nr_numerators;
 	struct
 	{
 		int labels[4];
 	}
-	numerators[512];
+	numerators[16];
 
 	double inversefactor,unphysical_penalty;
+
+#warning Creare un file limits, qui ci va MAXLABELS
+
+	struct label_t labels[32];
+	int ilabels;
 };
 
 /*

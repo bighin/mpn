@@ -429,13 +429,13 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 		return amx->cached_weight;
 	}
 
-	struct label_t labels[MAX_LABELS];
-	int ilabels=0;
 
 	struct amatrix_weight_t ret;
 
-	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, labels, &ilabels);
-	ret=incidence_to_weight(incidence, labels, &ilabels, amx);
+	ret.ilabels=0;
+
+	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, ret.labels, &ret.ilabels);
+	ret=incidence_to_weight(incidence, ret.labels, &ret.ilabels, amx);
 	gsl_matrix_int_free(incidence);
 
 	ret.weight=amx->config->bias+ret.weight/amatrix_multiplicity(amx);
