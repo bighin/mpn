@@ -116,7 +116,7 @@ void amatrix_save(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 	backup->dimensions[1]=amx->pmxs[1]->dimensions;
 
 	assert(backup->dimensions[0]==backup->dimensions[1]);
-	assert(backup->dimensions[0]<IMATRIX_MAX_DIMENSIONS);
+	assert(backup->dimensions[0]<PMATRIX_MAX_DIMENSIONS);
 
 	for(int i=0;i<backup->dimensions[0];i++)
 	{
@@ -137,7 +137,7 @@ void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 	amx->pmxs[1]->dimensions=backup->dimensions[1];
 
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
-	assert(amx->pmxs[0]->dimensions<IMATRIX_MAX_DIMENSIONS);
+	assert(amx->pmxs[0]->dimensions<PMATRIX_MAX_DIMENSIONS);
 
 	for(int i=0;i<amx->pmxs[0]->dimensions;i++)
 	{

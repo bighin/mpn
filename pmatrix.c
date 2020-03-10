@@ -126,13 +126,13 @@ int pmatrix_trace(struct pmatrix_t *pmx)
 	return ret;
 }
 
-double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx)
+double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj)
 {
 	int selector=gsl_rng_uniform_int(rngctx, pmx->dimensions+1);
 
 	assert(selector>=0);
 	assert(selector<(pmx->dimensions+1));
-	assert(pmx->dimensions<IMATRIX_MAX_DIMENSIONS);
+	assert(pmx->dimensions<PMATRIX_MAX_DIMENSIONS);
 
 	/*
 		There are (dims+1) ways of extending a matrix:
@@ -194,26 +194,34 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 			Finally we set the two new values.
 		*/
 
-		int newvalues[2];
-
 		if(pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))
-			newvalues[0]=pmatrix_get_entry(pmx, i, j);
+		{
+			pmatrix_set_entry(pmx, i, pmx->dimensions-1, pmatrix_get_entry(pmx, i, j));
+		}
 		else
-			newvalues[0]=pmatrix_get_new_value(pmx, rngctx, i, pmx->dimensions-1);
+		{
+			pmatrix_set_entry(pmx, i, pmx->dimensions-1, 1);
+			*targeti=i;
+			*targetj=pmx->dimensions-1;
+		}
 
 		if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
-			newvalues[1]=pmatrix_get_entry(pmx, i, j);
+		{
+			pmatrix_set_entry(pmx, pmx->dimensions-1, j, pmatrix_get_entry(pmx, i, j));
+		}
 		else
-			newvalues[1]=pmatrix_get_new_value(pmx, rngctx, pmx->dimensions-1, j);
+		{
+			pmatrix_set_entry(pmx, pmx->dimensions-1, j, 1);
+			*targeti=pmx->dimensions-1;
+			*targetj=j;
+		}
 
 		assert((pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))!=
 		       (pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j)));
 
-		pmatrix_set_entry(pmx, i, pmx->dimensions-1, newvalues[0]);
-		pmatrix_set_entry(pmx, pmx->dimensions-1, j, newvalues[1]);
 		pmatrix_set_entry(pmx, i, j, 0);
 
-		return pmx->dimensions*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(ectx->nvirt):(ectx->nocc));
+		return pmx->dimensions;
 	}
 	else if(selector==pmx->dimensions)
 	{
@@ -234,13 +242,18 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ct
 		}
 
 		/*
-			We just add the new element in the corner
+			We just add the new element in the corner.
+
+			Note that it is set to 1, and the caller must take care of
+			modifying it, if needed;
 		*/
 
-		int newvalue=pmatrix_get_new_value(pmx, rngctx, pmx->dimensions-1, pmx->dimensions-1);
-		pmatrix_set_entry(pmx, pmx->dimensions-1, pmx->dimensions-1, newvalue);
+		*targeti=pmx->dimensions-1;
+		*targetj=pmx->dimensions-1;
 
-		return pmx->dimensions*ectx->nocc;
+		pmatrix_set_entry(pmx, pmx->dimensions-1, pmx->dimensions-1, 1);
+
+		return pmx->dimensions;
 	}
 
 	assert(false);

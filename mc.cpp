@@ -27,6 +27,11 @@ extern "C" {
 	The updates
 */
 
+double extend_pdf(struct amatrix_t *amx, int i1, int j1, int value1, int i2, int j2, int value2)
+{
+	return 1.0f;
+}
+
 int update_extend(struct amatrix_t *amx, bool always_accept)
 {
 	double weightratio=1.0f/amatrix_weight(amx).weight;
@@ -38,8 +43,71 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	probability*=pmatrix_extend(amx->pmxs[0], amx->rng_ctx, amx->ectx);
-	probability*=pmatrix_extend(amx->pmxs[1], amx->rng_ctx, amx->ectx);
+	int i1,j1,i2,j2;
+
+	probability*=pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i1, &j1);
+	probability*=pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i2, &j2);
+
+	/*
+		Now we have to select the two missing values from a suitable distribution, that
+		will depend on two variables.
+
+		We map the (discrete) joint probability distribution function to a unidimensional
+		one, using p(index)=p(c,d) with:
+
+		index=c+d*nr_states1
+
+		the obvious inverses being:
+
+		c=index%nr_states1
+		d=index/nr_states1
+	*/
+
+	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
+	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
+
+	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
+	double *cdists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
+
+	for(int c=0;c<nr_states1;c++)
+	{
+		for(int d=0;d<nr_states2;d++)
+		{
+			int index=c+d*nr_states1;
+
+			dists[index]=extend_pdf(amx, i1, j1, 1+c, i2, j2, 1+d);
+		}
+	}
+
+	normalize_distribution(dists,nr_states1*nr_states2);
+	to_cumulative_distribution(dists,cdists,nr_states1*nr_states2);
+
+	double selector=gsl_rng_uniform(amx->rng_ctx);
+
+	/*
+		TODO: here I could use a binary search!
+	*/
+
+	for(int index=0;index<nr_states1*nr_states2;index++)
+	{
+		if(cdists[index]>=selector)
+		{
+			int c=index%nr_states1;
+			int d=index/nr_states1;
+
+			assert((c>=0)&&(c<nr_states1));
+			assert((d>=0)&&(d<nr_states2));
+
+			pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
+			pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
+			probability*=1.0f/dists[index];
+
+			break;
+		}
+	}
+
+	free(cdists);
+	free(dists);
 
 	amx->cached_weight_is_valid=false;
 
@@ -63,6 +131,53 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
+void find_squeeze_target(struct pmatrix_t *pmx,int *iprime,int *jprime)
+{
+#ifndef NDEBUG
+	*iprime=*jprime=-1;
+#endif
+
+	int dimensions=pmx->dimensions;
+
+	for(int i=0;i<dimensions;i++)
+	{
+		if(pmatrix_get_entry(pmx,i,dimensions-1)!=0)
+		{
+			*iprime=i;
+			break;
+		}
+	}
+
+	for(int j=0;j<dimensions;j++)
+	{
+		if(pmatrix_get_entry(pmx,dimensions-1,j)!=0)
+		{
+			*jprime=j;
+			break;
+		}
+	}
+
+	assert((*iprime!=-1)&&(*jprime!=-1));
+
+	if((*iprime==(dimensions-1))&&(*jprime==(dimensions-1)))
+		return;
+
+	assert(pmatrix_entry_type(*iprime,dimensions-1)!=pmatrix_entry_type(dimensions-1,*jprime));
+
+	if(pmatrix_entry_type(*iprime,*jprime)!=pmatrix_entry_type(*iprime,dimensions-1))
+	{
+		*jprime=dimensions-1;
+		return;
+	}
+	else if(pmatrix_entry_type(*iprime,*jprime)!=pmatrix_entry_type(dimensions-1,*jprime))
+	{
+		*iprime=dimensions-1;
+		return;
+	}
+
+	assert(false);
+}
+
 int update_squeeze(struct amatrix_t *amx, bool always_accept)
 {
 	double weightratio=1.0f/amatrix_weight(amx).weight;
@@ -73,6 +188,36 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
+
+	int i1,j1,i2,j2;
+
+	i1=j1=i2=j2=-1;
+	find_squeeze_target(amx->pmxs[0],&i1,&j1);
+	find_squeeze_target(amx->pmxs[1],&i2,&j2);
+
+	assert((i1!=-1)&&(j1!=-1)&&(i2!=-1)&&(j2!=-1));
+
+	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
+	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
+
+	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
+
+	for(int c=0;c<nr_states1;c++)
+	{
+		for(int d=0;d<nr_states2;d++)
+		{
+			int index=c+d*nr_states1;
+
+			dists[index]=extend_pdf(amx, i1, j1, 1+c, i2, j2, 1+d);
+		}
+	}
+
+	normalize_distribution(dists,nr_states1*nr_states2);
+
+	int index=(pmatrix_get_entry(amx->pmxs[0],i1,j1)-1)+(pmatrix_get_entry(amx->pmxs[1],i2,j2)-1)*nr_states1;
+	probability*=dists[index];
+
+	free(dists);
 
 	probability*=pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx, amx->ectx);
 	probability*=pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx, amx->ectx);

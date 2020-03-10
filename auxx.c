@@ -3,6 +3,8 @@
 #include <assert.h>
 #include <string.h>
 
+#include <gsl/gsl_math.h>
+
 #include "auxx.h"
 
 /*
@@ -369,3 +371,26 @@ char *find_and_replace(const char *src,const char *from,const char *to)
 
 	return value;
 }
+
+void normalize_distribution(double *dists, int nrstates)
+{
+	double total=0.0f;
+
+	for(int c=0;c<nrstates;c++)
+		total+=dists[c];
+
+	for(int c=0;c<nrstates;c++)
+		dists[c]/=total;
+}
+
+void to_cumulative_distribution(const double *dists, double *cdists, int nrstates)
+{
+	cdists[0]=dists[0];
+
+	for(int c=1;c<nrstates;c++)
+		cdists[c]=dists[c]+cdists[c-1];
+
+	assert(gsl_fcmp(cdists[nrstates-1], 1.0, 1e-8)==0);
+	cdists[nrstates-1]=1.0f;
+}
+

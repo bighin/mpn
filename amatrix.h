@@ -17,6 +17,11 @@ struct amatrix_weight_t
 {
 	double weight;
 	int l,h;
+
+#warning Please remove this debug code!
+
+	int numerators[512][4];
+	int nr_numerators;
 };
 
 /*
@@ -71,7 +76,7 @@ void amatrix_print(struct amatrix_t *amx);
 struct amatrix_backup_t
 {
 	int dimensions[2];
-	int values[2][IMATRIX_MAX_DIMENSIONS][IMATRIX_MAX_DIMENSIONS];
+	int values[2][PMATRIX_MAX_DIMENSIONS][PMATRIX_MAX_DIMENSIONS];
 
 	struct amatrix_weight_t cached_result;
 	bool cached_result_is_valid;

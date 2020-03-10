@@ -5,7 +5,7 @@
 
 #include "loaderis.h"
 
-#define IMATRIX_MAX_DIMENSIONS	(512)
+#define PMATRIX_MAX_DIMENSIONS	(512)
 
 struct pmatrix_t
 {
@@ -14,7 +14,7 @@ struct pmatrix_t
 	*/
 
 	int dimensions,nr_occupied,nr_virtual;
-	int values[IMATRIX_MAX_DIMENSIONS][IMATRIX_MAX_DIMENSIONS];
+	int values[PMATRIX_MAX_DIMENSIONS][PMATRIX_MAX_DIMENSIONS];
 };
 
 struct pmatrix_t *init_pmatrix(int nr_occupied,int nr_virtual,gsl_rng *rngctx);
@@ -29,7 +29,7 @@ int pmatrix_sum_row(struct pmatrix_t *pmx, int row);
 int pmatrix_sum_column(struct pmatrix_t *pmx, int column);
 int pmatrix_trace(struct pmatrix_t *pmx);
 
-double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx);
+double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj);
 double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx);
 
 void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx);

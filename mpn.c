@@ -240,6 +240,12 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 
 	double numerators=1.0f;
 
+#warning Please move this code below once debug is done!
+
+	struct amatrix_weight_t ret;
+
+	ret.nr_numerators=0;
+
 	for(size_t i=0;i<B->size1;i++)
 	{
 		/*
@@ -281,6 +287,14 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		i4=labels[mels[i][3]].value-1+((labels[mels[i][3]].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
 
 		numerators*=get_eri(amx->ectx, i1, i2, i3, i4);
+
+#warning Please remove this debug code!
+
+		ret.numerators[i][0]=i1;
+		ret.numerators[i][1]=i2;
+		ret.numerators[i][2]=i3;
+		ret.numerators[i][3]=i4;
+		ret.nr_numerators++;
 	}
 
 	double lindeloef_factor=exp(amx->config->epsilon*h*log(h));
@@ -293,8 +307,6 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		we return it.
 	*/
 
-	struct amatrix_weight_t ret;
-
 	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor;
 	ret.l=l;
 	ret.h=h;
@@ -306,7 +318,7 @@ gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_
 {
 	int dimensions=amx->pmxs[0]->dimensions;
 	assert(dimensions>0);
-	assert(dimensions<=IMATRIX_MAX_DIMENSIONS);
+	assert(dimensions<=PMATRIX_MAX_DIMENSIONS);
 
 	gsl_matrix_int *incidence=gsl_matrix_int_alloc(dimensions,2*dimensions);
 
