@@ -11,6 +11,7 @@
 struct label_t
 {
 	int id;
+	int i,j;
 	char mnemonic;
 	int value;
 

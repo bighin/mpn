@@ -74,6 +74,82 @@ int count_loops(struct label_t *labels, int *ilabels, int mels[MAX_MATRIX_ELEMEN
 	return loops;
 }
 
+void add_denominator_entry(struct amatrix_weight_t *awt, int label, int qtype)
+{
+	int index=awt->denominators[awt->nr_denominators].ilabels;
+
+	awt->denominators[awt->nr_denominators].labels[index]=label;
+	awt->denominators[awt->nr_denominators].qtypes[index]=qtype;
+	awt->denominators[awt->nr_denominators].ilabels++;
+}
+
+void add_numerator(struct amatrix_weight_t *awt,int l1,int l2,int l3,int l4)
+{
+	awt->numerators[awt->nr_numerators].labels[0]=l1;
+	awt->numerators[awt->nr_numerators].labels[1]=l2;
+	awt->numerators[awt->nr_numerators].labels[2]=l3;
+	awt->numerators[awt->nr_numerators].labels[3]=l4;
+	awt->nr_numerators++;
+}
+
+void add_unphysical_penalty(struct amatrix_weight_t *awt,double penalty)
+{
+	awt->unphysical_penalty*=penalty;
+}
+
+double reconstruct_weight(struct amatrix_weight_t *awt,struct label_t *labels,struct energies_ctx_t *ectx)
+{
+	double denominators=1.0f;
+
+	for(int c=0;c<awt->nr_denominators;c++)
+	{
+		double denominator=0.0f;
+
+		for(int d=0;d<awt->denominators[c].ilabels;d++)
+		{
+			int label=awt->denominators[c].labels[d];
+
+			int sign=(awt->denominators[c].qtypes[d]==QTYPE_OCCUPIED)?(1):(-1);
+
+			switch(awt->denominators[c].qtypes[d])
+			{
+				case QTYPE_OCCUPIED:
+				denominator+=get_occupied_energy(ectx, labels[label].value-1);
+				break;
+
+				case QTYPE_VIRTUAL:
+				denominator-=get_virtual_energy(ectx, labels[label].value-1);
+				break;
+			}
+		}
+
+		denominators*=denominator;
+	}
+
+	double numerators=1.0f;
+
+	for(int c=0;c<awt->nr_numerators;c++)
+	{
+		int l1,l2,l3,l4;
+
+		l1=awt->numerators[c].labels[0];
+		l2=awt->numerators[c].labels[1];
+		l3=awt->numerators[c].labels[2];
+		l4=awt->numerators[c].labels[3];
+
+		int i1,i2,i3,i4;
+
+		i1=labels[l1].value-1+((labels[l1].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+		i2=labels[l2].value-1+((labels[l2].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+		i3=labels[l3].value-1+((labels[l3].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+		i4=labels[l4].value-1+((labels[l4].qtype==QTYPE_VIRTUAL)?(ectx->nocc):(0));
+
+		numerators*=get_eri(ectx, i1, i2, i3, i4);
+	}
+
+	return pow(awt->inversefactor,-1.0f)*awt->unphysical_penalty*numerators/denominators;
+}
+
 /*
 	This function calculates a diagram's weight given the incidence matrix
 */
@@ -158,6 +234,17 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	}
 
 	/*
+		This structure will contain the final calculated weight, along with plenty of
+		additional information, allowing one to reconstruct the weight from scratch.
+	*/
+
+	struct amatrix_weight_t ret;
+
+	ret.nr_denominators=0;
+	ret.nr_numerators=0;
+	ret.unphysical_penalty=1.0f;
+
+	/*
 		Rule 4: denominators
 	*/
 
@@ -170,6 +257,8 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 
 		double denominator=0.0f;
 		int energies_in_denominator=0;
+
+		ret.denominators[ret.nr_denominators].ilabels=0;
 
 		for(size_t j=0;j<B->size2;j++)
 		{
@@ -186,6 +275,8 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 
 				if(verbose==true)
 					printf("%c",labels[j].mnemonic);
+
+				add_denominator_entry(&ret, j, labels[j].qtype);
 
 				switch(labels[j].qtype)
 				{
@@ -206,7 +297,10 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		}
 
 		if(energies_in_denominator>0)
+		{
 			denominators*=denominator;
+			ret.nr_denominators++;
+		}
 
 		if(verbose==true)
 			printf("}\n");
@@ -240,12 +334,6 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 
 	double numerators=1.0f;
 
-#warning Please move this code below once debug is done!
-
-	struct amatrix_weight_t ret;
-
-	ret.nr_numerators=0;
-
 	for(size_t i=0;i<B->size1;i++)
 	{
 		/*
@@ -263,6 +351,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 			*/
 
 			numerators*=amx->config->unphysicalpenalty;
+			add_unphysical_penalty(&ret,amx->config->unphysicalpenalty);
 
 			continue;
 		}
@@ -288,13 +377,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 
 		numerators*=get_eri(amx->ectx, i1, i2, i3, i4);
 
-#warning Please remove this debug code!
-
-		ret.numerators[i][0]=i1;
-		ret.numerators[i][1]=i2;
-		ret.numerators[i][2]=i3;
-		ret.numerators[i][3]=i4;
-		ret.nr_numerators++;
+		add_numerator(&ret,mels[i][0],mels[i][1],mels[i][2],mels[i][3]);
 	}
 
 	double lindeloef_factor=exp(amx->config->epsilon*h*log(h));
@@ -310,6 +393,10 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor;
 	ret.l=l;
 	ret.h=h;
+	ret.inversefactor=inversefactor;
+
+	if(fabs(ret.weight)>1e-4)
+		assert(gsl_fcmp(ret.weight,reconstruct_weight(&ret,labels,amx->ectx),1e-8)==0);
 
 	return ret;
 }
@@ -358,6 +445,8 @@ gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_
 					int qtype=pmatrix_entry_type(i,j);
 
 					labels[*ilabels].id=*ilabels;
+					labels[*ilabels].i=i;
+					labels[*ilabels].j=j;
 					labels[*ilabels].mnemonic=get_nth_character(mnemonics[qtype],imnemonics[qtype]++);
 					labels[*ilabels].qtype=qtype;
 					labels[*ilabels].value=pmatrix_get_entry(amx->pmxs[0], i, j);
@@ -388,6 +477,8 @@ gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_
 					int qtype=pmatrix_entry_type(i,j);
 
 					labels[*ilabels].id=*ilabels;
+					labels[*ilabels].i=i;
+					labels[*ilabels].j=j;
 					labels[*ilabels].mnemonic=get_nth_character(mnemonics[qtype],imnemonics[qtype]++);
 					labels[*ilabels].qtype=qtype;
 					labels[*ilabels].value=pmatrix_get_entry(amx->pmxs[1], i, j);
@@ -424,6 +515,8 @@ gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_
 					int qtype=pmatrix_entry_type(i,j);
 
 					labels[*ilabels].id=*ilabels;
+					labels[*ilabels].i=i;
+					labels[*ilabels].j=j;
 					labels[*ilabels].mnemonic=get_nth_character(mnemonics[qtype], imnemonics[qtype]++);
 					labels[*ilabels].qtype=qtype;
 					labels[*ilabels].value=pmatrix_get_entry(amx->pmxs[0], i, j);
@@ -458,6 +551,8 @@ gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_
 					int qtype=pmatrix_entry_type(i,j);
 
 					labels[*ilabels].id=*ilabels;
+					labels[*ilabels].i=i;
+					labels[*ilabels].j=j;
 					labels[*ilabels].mnemonic=get_nth_character(mnemonics[qtype],imnemonics[qtype]++);
 					labels[*ilabels].qtype=qtype;
 					labels[*ilabels].value=pmatrix_get_entry(amx->pmxs[1], i, j);

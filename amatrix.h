@@ -15,13 +15,35 @@
 
 struct amatrix_weight_t
 {
+	/*
+		The actual weight.
+	*/
+
 	double weight;
+
+	/*
+		This information can be used to reconstruct the weight, given the labels.
+	*/
+
 	int l,h;
 
-#warning Please remove this debug code!
+	int nr_denominators;
+	struct
+	{
+		int labels[32];
+		int qtypes[32];
+		int ilabels;
+	}
+	denominators[512];
 
-	int numerators[512][4];
 	int nr_numerators;
+	struct
+	{
+		int labels[4];
+	}
+	numerators[512];
+
+	double inversefactor,unphysical_penalty;
 };
 
 /*
