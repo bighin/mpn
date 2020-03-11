@@ -27,6 +27,23 @@ extern "C" {
 	The updates
 */
 
+int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j)
+{
+	for(int c=0;c<ilabels;c++)
+	{
+		if((labels[c].i==i)&&(labels[c].j==j))
+			return c;
+	}
+
+	assert(false);
+	return 0;
+}
+
+double extend_pdf(struct amatrix_t *amx,struct amatrix_weight_t *w)
+{
+	return 1.0f;//(fabs(reconstruct_weight(w,amx->ectx))>1e-8)?(1.0f):(0.0);
+}
+
 int update_extend(struct amatrix_t *amx, bool always_accept)
 {
 	double weightratio=1.0f/amatrix_weight(amx).weight;
@@ -38,10 +55,87 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	probability*=pmatrix_extend(amx->pmxs[0], amx->rng_ctx, amx->ectx);
-	probability*=pmatrix_extend(amx->pmxs[1], amx->rng_ctx, amx->ectx);
+	int i1,j1,i2,j2;
 
+	probability*=pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i1, &j1);
+	probability*=pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i2, &j2);
 	amx->cached_weight_is_valid=false;
+
+	struct amatrix_weight_t w=amatrix_weight(amx);
+
+	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1);
+	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2);
+
+	/*
+		Now we have to select the two missing values from a suitable distribution, that
+		will depend on two variables.
+
+		We map the (discrete) joint probability distribution function to a unidimensional
+		one, using p(index)=p(c,d) with:
+
+		index=c+d*nr_states1
+
+		the obvious inverses being:
+
+		c=index%nr_states1
+		d=index/nr_states1
+	*/
+
+	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
+	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
+
+	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
+	double *cdists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
+
+	for(int c=0;c<nr_states1;c++)
+	{
+		for(int d=0;d<nr_states2;d++)
+		{
+			int index=c+d*nr_states1;
+
+			pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
+			pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
+
+			w.labels[label1].value=1+c;
+			w.labels[label2].value=1+d;
+
+			dists[index]=extend_pdf(amx,&w);
+		}
+	}
+
+	normalize_distribution(dists,nr_states1*nr_states2);
+	to_cumulative_distribution(dists,cdists,nr_states1*nr_states2);
+
+	double selector=gsl_rng_uniform(amx->rng_ctx);
+
+	/*
+		TODO: here I could use a binary search!
+	*/
+
+	for(int index=0;index<nr_states1*nr_states2;index++)
+	{
+		if(cdists[index]<=selector)
+		{
+			int c=index%nr_states1;
+			int d=index/nr_states1;
+
+			assert((c>=0)&&(c<nr_states1));
+			assert((d>=0)&&(d<nr_states2));
+
+			pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
+			pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
+
+			w.labels[label1].value=1+c;
+			w.labels[label2].value=1+d;
+
+			probability*=1.0f/dists[index];
+
+			break;
+		}
+	}
+
+	free(cdists);
+	free(dists);
 
 	/*
 		Finally we calculate the acceptance ratio for the update.
@@ -49,7 +143,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=amatrix_weight(amx).weight;
+	weightratio*=reconstruct_weight(&w,amx->ectx);
 	acceptance_ratio=fabs(weightratio)*probability;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
@@ -63,9 +157,68 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
+void find_squeeze_target(struct pmatrix_t *pmx,int *iprime,int *jprime)
+{
+#ifndef NDEBUG
+	*iprime=*jprime=-1;
+#endif
+
+	int dimensions=pmx->dimensions;
+
+	for(int i=0;i<dimensions;i++)
+	{
+		if(pmatrix_get_entry(pmx,i,dimensions-1)!=0)
+		{
+			*iprime=i;
+			break;
+		}
+	}
+
+	for(int j=0;j<dimensions;j++)
+	{
+		if(pmatrix_get_entry(pmx,dimensions-1,j)!=0)
+		{
+			*jprime=j;
+			break;
+		}
+	}
+
+	assert((*iprime!=-1)&&(*jprime!=-1));
+
+	/*
+		If the Squeeze update will be targeting the corner entry in
+		the bottom-right corner, we can return straight away.
+	*/
+
+	if((*iprime==(dimensions-1))&&(*jprime==(dimensions-1)))
+		return;
+
+	/*
+		Otherwise the update will be targeting an entry either in the rightmost
+		column or in the bottom row. Let's find the coordinates and return.
+	*/
+
+	assert(pmatrix_entry_type(*iprime,dimensions-1)!=pmatrix_entry_type(dimensions-1,*jprime));
+
+	if(pmatrix_entry_type(*iprime,*jprime)!=pmatrix_entry_type(*iprime,dimensions-1))
+	{
+		*jprime=dimensions-1;
+		return;
+	}
+	else if(pmatrix_entry_type(*iprime,*jprime)!=pmatrix_entry_type(dimensions-1,*jprime))
+	{
+		*iprime=dimensions-1;
+		return;
+	}
+
+	assert(false);
+}
+
 int update_squeeze(struct amatrix_t *amx, bool always_accept)
 {
-	double weightratio=1.0f/amatrix_weight(amx).weight;
+	struct amatrix_weight_t w=amatrix_weight(amx);
+
+	double weightratio=1.0f/w.weight;
 	double probability=1.0f;
 
 	if(amx->pmxs[0]->dimensions<=amx->config->minorder)
@@ -73,6 +226,45 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
+
+	int i1,j1,i2,j2;
+
+	i1=j1=i2=j2=-1;
+	find_squeeze_target(amx->pmxs[0],&i1,&j1);
+	find_squeeze_target(amx->pmxs[1],&i2,&j2);
+
+	assert((i1!=-1)&&(j1!=-1)&&(i2!=-1)&&(j2!=-1));
+
+	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1);
+	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2);
+
+	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
+	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
+
+	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
+
+	for(int c=0;c<nr_states1;c++)
+	{
+		for(int d=0;d<nr_states2;d++)
+		{
+			int index=c+d*nr_states1;
+
+			pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
+			pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
+
+			w.labels[label1].value=1+c;
+			w.labels[label2].value=1+d;
+
+			dists[index]=extend_pdf(amx,&w);
+		}
+	}
+
+	normalize_distribution(dists,nr_states1*nr_states2);
+
+	int index=(pmatrix_get_entry(amx->pmxs[0],i1,j1)-1)+(pmatrix_get_entry(amx->pmxs[1],i2,j2)-1)*nr_states1;
+	probability*=dists[index];
+
+	free(dists);
 
 	probability*=pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx, amx->ectx);
 	probability*=pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx, amx->ectx);
