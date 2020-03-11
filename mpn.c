@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #include <gsl/gsl_math.h>
 #include <gsl/gsl_matrix.h>
@@ -394,6 +395,9 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	ret.l=l;
 	ret.h=h;
 	ret.inversefactor=inversefactor;
+
+	memcpy(ret.labels,labels,sizeof(struct label_t)*MAX_LABELS);
+	ret.ilabels=*ilabels;
 
 	if(fabs(ret.weight)>1e-4)
 		assert(gsl_fcmp(ret.weight,reconstruct_weight(&ret,amx->ectx),1e-8)==0);

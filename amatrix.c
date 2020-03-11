@@ -432,8 +432,6 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 
 	struct amatrix_weight_t ret;
 
-	ret.ilabels=0;
-
 	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, ret.labels, &ret.ilabels);
 	ret=incidence_to_weight(incidence, ret.labels, &ret.ilabels, amx);
 	gsl_matrix_int_free(incidence);

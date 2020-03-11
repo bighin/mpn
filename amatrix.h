@@ -7,11 +7,13 @@
 #include "pmatrix.h"
 #include "loaderis.h"
 #include "config.h"
+#include "limits.h"
 #include "mpn.h"
 
 /*
 	This structure saves the result of the evaluation of the weight of a matrix,
-	as well as a couple of other quantities (number of hole states and number of loops).
+	and many intermediate results that can be used to recalculated the weight after
+	having modified a quantum number
 */
 
 struct amatrix_weight_t
@@ -31,24 +33,22 @@ struct amatrix_weight_t
 	int nr_denominators;
 	struct
 	{
-		int labels[32];
-		int qtypes[32];
+		int labels[MAX_LABELS];
+		int qtypes[MAX_LABELS];
 		int ilabels;
 	}
-	denominators[16];
+	denominators[MAX_DENOMINATORS];
 
 	int nr_numerators;
 	struct
 	{
 		int labels[4];
 	}
-	numerators[16];
+	numerators[MAX_NUMERATORS];
 
 	double inversefactor,unphysical_penalty;
 
-#warning Creare un file limits, qui ci va MAXLABELS
-
-	struct label_t labels[32];
+	struct label_t labels[MAX_LABELS];
 	int ilabels;
 };
 
