@@ -32,38 +32,10 @@ int amatrix_to_index(struct amatrix_t *amx)
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	int dimensions=amx->pmxs[0]->dimensions;
 
-	/*
-		TODO: there is space for optimization here, in particular one could rewrite
-		matrix_to_permutation() and avoid having to create two gsl_matrix_int's.
-		Is this critical?
-	*/
-
-	gsl_matrix_int *a,*b;
 	int pa[16],pb[16];
 
-	a=gsl_matrix_int_alloc(dimensions,dimensions);
-	b=gsl_matrix_int_alloc(dimensions,dimensions);
-
-	gsl_matrix_int_set_zero(a);
-	gsl_matrix_int_set_zero(b);
-
-	for(int i=0;i<dimensions;i++)
-	{
-		for(int j=0;j<dimensions;j++)
-		{
-			if(amx->pmxs[0]->values[i][j]!=0)
-				gsl_matrix_int_set(a, i, j,1);
-
-			if(amx->pmxs[1]->values[i][j]!=0)
-				gsl_matrix_int_set(b, i, j,1);
-		}
-	}
-
-	matrix_to_permutation(a,pa);
-	matrix_to_permutation(b,pb);
-
-	gsl_matrix_int_free(a);
-	gsl_matrix_int_free(b);
+	pmatrix_to_permutation(amx->pmxs[0],pa);
+	pmatrix_to_permutation(amx->pmxs[1],pb);
 
 	return ifactorial(dimensions)*get_permutation_index(pb,dimensions)+get_permutation_index(pa,dimensions);
 }

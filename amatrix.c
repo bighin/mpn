@@ -4,6 +4,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include <gsl/gsl_math.h>
 #include <gsl/gsl_matrix_int.h>
 
 #include "amatrix.h"
@@ -385,7 +386,13 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 
 #ifndef NDEBUG
 		amx->cached_weight_is_valid=false;
-		assert(amx->cached_weight.weight==amatrix_weight(amx).weight);
+
+		double w1,w2;
+
+		w1=amx->cached_weight.weight;
+		w2=amatrix_weight(amx).weight;
+		assert(gsl_fcmp(w1,w2,1e-6)==0);
+
 		amx->cached_weight_is_valid=true;
 #endif
 
@@ -428,7 +435,6 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 
 		return amx->cached_weight;
 	}
-
 
 	struct amatrix_weight_t ret;
 

@@ -13,6 +13,8 @@ extern "C" {
 #include <assert.h>
 #include <sys/time.h>
 #include <signal.h>
+
+#include <gsl/gsl_math.h>
 #include <gsl/gsl_rng.h>
 
 #include "mc.h"
@@ -27,13 +29,11 @@ extern "C" {
 	The updates
 */
 
-int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j)
+int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int pmatrix)
 {
 	for(int c=0;c<ilabels;c++)
-	{
-		if((labels[c].i==i)&&(labels[c].j==j))
+		if((labels[c].i==i)&&(labels[c].j==j)&&(labels[c].pmatrix==pmatrix))
 			return c;
-	}
 
 	assert(false);
 	return 0;
@@ -41,7 +41,7 @@ int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j)
 
 double extend_pdf(struct amatrix_t *amx,struct amatrix_weight_t *w)
 {
-	return 1.0f;//(fabs(reconstruct_weight(w,amx->ectx))>1e-8)?(1.0f):(0.0);
+	return fabs(reconstruct_weight(amx,w));
 }
 
 int update_extend(struct amatrix_t *amx, bool always_accept)
@@ -59,16 +59,20 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 	probability*=pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i1, &j1);
 	probability*=pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i2, &j2);
+
+	if(amatrix_check_connectedness(amx)==false)
+	{
+		amatrix_restore(amx, &backup);
+		return UPDATE_REJECTED;
+	}
+
 	amx->cached_weight_is_valid=false;
 
 	struct amatrix_weight_t w=amatrix_weight(amx);
 
-	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1);
-	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2);
-
 	/*
 		Now we have to select the two missing values from a suitable distribution, that
-		will depend on two variables.
+		depends, therefore, on two variables.
 
 		We map the (discrete) joint probability distribution function to a unidimensional
 		one, using p(index)=p(c,d) with:
@@ -84,6 +88,9 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
 	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
 
+	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1,0);
+	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2,1);
+
 	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
 	double *cdists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
 
@@ -92,9 +99,6 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 		for(int d=0;d<nr_states2;d++)
 		{
 			int index=c+d*nr_states1;
-
-			pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
-			pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
 
 			w.labels[label1].value=1+c;
 			w.labels[label2].value=1+d;
@@ -112,18 +116,37 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 		TODO: here I could use a binary search!
 	*/
 
-	for(int index=0;index<nr_states1*nr_states2;index++)
-	{
-		if(cdists[index]<=selector)
-		{
-			int c=index%nr_states1;
-			int d=index/nr_states1;
+	int c,d,index;
 
+#if 1
+	index=cdist_binary_search(cdists,0,nr_states1*nr_states2,selector);
+	c=index%nr_states1;
+	d=index/nr_states1;
+
+	pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
+	pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
+	amx->cached_weight_is_valid=false;
+
+	w.labels[label1].value=1+c;
+	w.labels[label2].value=1+d;
+
+	probability*=1.0f/dists[index];
+
+#else
+	for(index=0;index<nr_states1*nr_states2;index++)
+	{
+		if(selector<cdists[index])
+		{
+			c=index%nr_states1;
+			d=index/nr_states1;
+
+			assert(index==(c+d*nr_states1));
 			assert((c>=0)&&(c<nr_states1));
 			assert((d>=0)&&(d<nr_states2));
 
 			pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
 			pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
+			amx->cached_weight_is_valid=false;
 
 			w.labels[label1].value=1+c;
 			w.labels[label2].value=1+d;
@@ -133,6 +156,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 			break;
 		}
 	}
+#endif
 
 	free(cdists);
 	free(dists);
@@ -143,7 +167,13 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=reconstruct_weight(&w,amx->ectx);
+	double currentweight=reconstruct_weight(amx, &w);
+
+	amx->cached_weight=w;
+	amx->cached_weight.weight=currentweight;
+	amx->cached_weight_is_valid=true;
+
+	weightratio*=currentweight;
 	acceptance_ratio=fabs(weightratio)*probability;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
@@ -229,14 +259,14 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 
 	int i1,j1,i2,j2;
 
-	i1=j1=i2=j2=-1;
 	find_squeeze_target(amx->pmxs[0],&i1,&j1);
 	find_squeeze_target(amx->pmxs[1],&i2,&j2);
 
-	assert((i1!=-1)&&(j1!=-1)&&(i2!=-1)&&(j2!=-1));
+	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1,0);
+	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2,1);
 
-	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1);
-	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2);
+	int value1=pmatrix_get_entry(amx->pmxs[0],i1,j1);
+	int value2=pmatrix_get_entry(amx->pmxs[1],i2,j2);
 
 	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
 	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
@@ -249,9 +279,6 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 		{
 			int index=c+d*nr_states1;
 
-			pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
-			pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
-
 			w.labels[label1].value=1+c;
 			w.labels[label2].value=1+d;
 
@@ -261,14 +288,13 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 
 	normalize_distribution(dists,nr_states1*nr_states2);
 
-	int index=(pmatrix_get_entry(amx->pmxs[0],i1,j1)-1)+(pmatrix_get_entry(amx->pmxs[1],i2,j2)-1)*nr_states1;
+	int index=(value1-1)+(value2-1)*nr_states1;
 	probability*=dists[index];
 
 	free(dists);
 
-	probability*=pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx, amx->ectx);
-	probability*=pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx, amx->ectx);
-
+	probability*=pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx);
+	probability*=pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx);
 	amx->cached_weight_is_valid=false;
 
 	double acceptance_ratio;

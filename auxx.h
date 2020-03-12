@@ -30,5 +30,6 @@ char *find_and_replace(const char *src,const char *from,const char *to);
 
 void normalize_distribution(double *dists, int nrstates);
 void to_cumulative_distribution(const double *dists, double *cdists, int nrstates);
+int cdist_binary_search(const double *cdists, int lo, int hi,double selector);
 
 #endif //__AUXX_H__

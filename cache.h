@@ -7,6 +7,7 @@
 #include <gsl/gsl_matrix_int.h>
 
 #include "amatrix.h"
+#include "pmatrix.h"
 
 extern int amatrix_cache_max_dimensions;
 extern bool amatrix_cache_is_enabled;
@@ -16,6 +17,7 @@ int cache_largest_index(int dimensions);
 
 gsl_matrix_int *permutation_to_matrix(const int *permutation,int dimensions);
 void matrix_to_permutation(gsl_matrix_int *m,int *permutation);
+void pmatrix_to_permutation(struct pmatrix_t *m,int *permutation);
 
 bool init_cache(int max_dimensions);
 

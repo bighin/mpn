@@ -3,6 +3,7 @@
 
 #include "permutations.h"
 #include "plist.h"
+#include "pmatrix.h"
 
 /*
 	Given a N-permutation of number from 1 to N, returns its index in the lexicographic
@@ -66,6 +67,23 @@ void matrix_to_permutation(gsl_matrix_int *m,int *permutation)
 		for(int j=0;j<dimensions;j++)
 		{
 			if(gsl_matrix_int_get(m,i,j)!=0)
+			{
+				permutation[i]=j+1;
+				break;
+			}
+		}
+	}
+}
+
+void pmatrix_to_permutation(struct pmatrix_t *m,int *permutation)
+{
+	int dimensions=m->dimensions;
+
+	for(int i=0;i<dimensions;i++)
+	{
+		for(int j=0;j<dimensions;j++)
+		{
+			if(pmatrix_get_entry(m,i,j)!=0)
 			{
 				permutation[i]=j+1;
 				break;

@@ -260,7 +260,7 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int 
 	return 0.0f;
 }
 
-double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_ctx_t *ectx)
+double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx)
 {
 	assert(pmx->dimensions>1);
 
@@ -313,7 +313,7 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_c
 
 		pmx->dimensions--;
 
-		return 1.0f/((pmx->dimensions+1)*ectx->nocc);
+		return 1.0f/(pmx->dimensions+1);
 	}
 
 	/*
@@ -340,7 +340,7 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx, struct energies_c
 
 	pmx->dimensions--;
 
-	return 1.0f/((pmx->dimensions+1)*((pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)?(ectx->nvirt):(ectx->nocc)));
+	return 1.0f/(pmx->dimensions+1);
 }
 
 void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx)
