@@ -394,12 +394,12 @@ void to_cumulative_distribution(const double *dists, double *cdists, int nrstate
 	cdists[nrstates-1]=1.0f;
 }
 
-int cdist_binary_search(const double *cdists, int lo, int hi,double selector)
+int cdist_search(const double *cdists, int lo, int hi, double selector)
 {
 	if(lo>=hi)
 		return lo;
 
-	if(selector<cdists[lo])
+	if(selector<=cdists[lo])
 		return lo;
 
 	if(lo==(hi-1))
@@ -407,10 +407,20 @@ int cdist_binary_search(const double *cdists, int lo, int hi,double selector)
 
 	int mid=lo+(hi-lo)/2;
 
-	if(selector<cdists[mid])
-		return cdist_binary_search(cdists,lo,mid,selector);
+	if(selector<=cdists[mid])
+		return cdist_search(cdists, lo, mid, selector);
 	else
-		return cdist_binary_search(cdists,mid,hi,selector);
+		return cdist_search(cdists, mid, hi, selector);
+
+	assert(false);
+	return 0;
+}
+
+int cdist_linear_search(const double *cdists, int lo, int hi, double selector)
+{
+	for(int index=lo;index<hi;index++)
+		if(selector<=cdists[index])
+			return index;
 
 	assert(false);
 	return 0;

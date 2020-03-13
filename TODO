@@ -5,4 +5,6 @@
 
 - One could cache the result of count_loops(), as well.
 
-- If not used, remove the Lindelöf factor
+- If not used, remove the Lindelï¿½f factor
+
+- Even the 'bias' could be removed or rethought.

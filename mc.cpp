@@ -100,6 +100,8 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 		{
 			int index=c+d*nr_states1;
 
+			assert(index==((index%nr_states1)+(index/nr_states1)*nr_states1));
+
 			w.labels[label1].value=1+c;
 			w.labels[label2].value=1+d;
 
@@ -110,18 +112,20 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	normalize_distribution(dists,nr_states1*nr_states2);
 	to_cumulative_distribution(dists,cdists,nr_states1*nr_states2);
 
-	double selector=gsl_rng_uniform(amx->rng_ctx);
-
 	/*
-		TODO: here I could use a binary search!
+		Now that we have the probability distribution, we sample one random value from it.
 	*/
+
+	double selector=gsl_rng_uniform(amx->rng_ctx);
 
 	int c,d,index;
 
-#if 1
-	index=cdist_binary_search(cdists,0,nr_states1*nr_states2,selector);
+	index=cdist_search(cdists, 0, nr_states1*nr_states2, selector);
 	c=index%nr_states1;
 	d=index/nr_states1;
+
+	assert(index==(c+d*nr_states1));
+	assert(cdist_search(cdists, 0, nr_states1*nr_states2, selector)==cdist_linear_search(cdists, 0, nr_states1*nr_states2, selector));
 
 	pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
 	pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
@@ -132,32 +136,6 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 	probability*=1.0f/dists[index];
 
-#else
-	for(index=0;index<nr_states1*nr_states2;index++)
-	{
-		if(selector<cdists[index])
-		{
-			c=index%nr_states1;
-			d=index/nr_states1;
-
-			assert(index==(c+d*nr_states1));
-			assert((c>=0)&&(c<nr_states1));
-			assert((d>=0)&&(d<nr_states2));
-
-			pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
-			pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
-			amx->cached_weight_is_valid=false;
-
-			w.labels[label1].value=1+c;
-			w.labels[label2].value=1+d;
-
-			probability*=1.0f/dists[index];
-
-			break;
-		}
-	}
-#endif
-
 	free(cdists);
 	free(dists);
 
@@ -166,7 +144,6 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	*/
 
 	double acceptance_ratio;
-
 	double currentweight=reconstruct_weight(amx, &w);
 
 	amx->cached_weight=w;

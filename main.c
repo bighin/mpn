@@ -3,10 +3,13 @@
 #include <math.h>
 #include <assert.h>
 
+#include <gsl/gsl_rng.h>
+
 #include "amatrix.h"
 #include "mc.h"
 #include "config.h"
 #include "cache.h"
+#include "auxx.h"
 
 void usage(char *argv0)
 {
