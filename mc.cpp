@@ -95,6 +95,29 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
 	double *cdists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
 
+	bool use_jit=false;
+
+	typedef double (*FF)(struct energies_ctx_t *, int, int);
+	FF closure;
+	jit_context_t context;
+
+	if(use_jit==true)
+	{
+		context=jit_context_create();
+
+		jit_function_t jf=weight_to_jit(amx, &w, label1, label2, context);
+
+		/*
+			Compile (JIT) the function to machine code
+		*/
+
+		jit_context_build_start(context);
+		jit_function_compile(jf);
+		jit_context_build_end(context);
+
+		closure = (FF) jit_function_to_closure(jf);
+	}
+
 	for(int c=0;c<nr_states1;c++)
 	{
 		for(int d=0;d<nr_states2;d++)
@@ -103,11 +126,30 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 			assert(index==((index%nr_states1)+(index/nr_states1)*nr_states1));
 
-			w.labels[label1].value=1+c;
-			w.labels[label2].value=1+d;
+			if(use_jit==true)
+			{
+				dists[index]=fabs(closure(amx->ectx, 1+c, 1+d));
 
-			dists[index]=extend_pdf(amx,&w);
+#ifndef NDEBUG
+				w.labels[label1].value=1+c;
+				w.labels[label2].value=1+d;
+
+				assert(dists[index]==extend_pdf(amx, &w));
+#endif
+			}
+			else
+			{
+				w.labels[label1].value=1+c;
+				w.labels[label2].value=1+d;
+
+				dists[index]=extend_pdf(amx, &w);
+			}
 		}
+	}
+
+	if(use_jit==true)
+	{
+		jit_context_destroy(context);
 	}
 
 	normalize_distribution(dists,nr_states1*nr_states2);
