@@ -19,6 +19,9 @@ bool columns_are_identical(gsl_matrix_int *m, size_t col1, size_t col2);
 int positive_part(int x);
 int negative_part(int x);
 
+double fpositive_part(double x);
+double fnegative_part(double x);
+
 #define MIN(x,y)	(((x)<(y))?(x):(y))
 #define MAX(x,y)	(((x)>(y))?(x):(y))
 

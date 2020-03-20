@@ -2,6 +2,10 @@
 #define PMATRIX_MAX_DIMENSIONS	(64)
 #endif
 
+#ifndef MAX_ORDER
+#define MAX_ORDER	PMATRIX_MAX_DIMENSIONS
+#endif
+
 #ifndef MAX_LABELS
 #define MAX_LABELS		(32)
 #endif

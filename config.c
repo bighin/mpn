@@ -86,6 +86,19 @@ int configuration_handler(void *user,const char *section,const char *name,const 
 	{
 		pconfig->decorrelation=atoi(value);
 	}
+	else if(MATCH("sampling","type"))
+	{
+		if(!strcmp(value,"standard"))
+			pconfig->type=SAMPLING_TYPE_STANDARD;
+		else if(!strcmp(value,"onlypositive"))
+			pconfig->type=SAMPLING_TYPE_ONLYPOSITIVE;
+		else if(!strcmp(value,"onlynegative"))
+			pconfig->type=SAMPLING_TYPE_ONLYNEGATIVE;
+		else if(!strcmp(value,"hybrid"))
+			pconfig->type=SAMPLING_TYPE_HYBRID;
+		else
+			return 0;
+	}
 	else
 	{
 		/* Unknown section/name, error */
@@ -112,6 +125,7 @@ void load_config_defaults(struct configuration_t *config)
 	config->thermalization=config->iterations/100;
 	config->timelimit=0.0f;
 	config->decorrelation=10;
+	config->type=SAMPLING_TYPE_STANDARD;
 
 	config->inipath=NULL;
 }

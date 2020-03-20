@@ -180,7 +180,7 @@ bool columns_are_identical(gsl_matrix_int *m, size_t col1, size_t col2)
 }
 
 /*
-	Positive and negative part of an integer number
+	Positive and negative part of an integer and a double number
 */
 
 int positive_part(int x)
@@ -191,6 +191,16 @@ int positive_part(int x)
 int negative_part(int x)
 {
 	return (x<0)?(-x):(0);
+}
+
+double fpositive_part(double x)
+{
+	return (x>0.0f)?(x):(0.0f);
+}
+
+double fnegative_part(double x)
+{
+	return (x<0.0f)?(-x):(0.0f);
 }
 
 /*
