@@ -22,55 +22,8 @@ extern "C" {
 #include "auxx.h"
 #include "mpn.h"
 #include "config.h"
-#include "jit.h"
 
 #include "libprogressbar/progressbar.h"
-
-const char *sampling_type_description(int type)
-{
-	switch(type)
-	{
-		case SAMPLING_TYPE_STANDARD:
-		return "standard";
-
-		case SAMPLING_TYPE_ONLYNEGATIVE:
-		return "only negative";
-
-		case SAMPLING_TYPE_ONLYPOSITIVE:
-		return "only postive";
-
-		case SAMPLING_TYPE_HYBRID:
-		return "hybrid";
-	}
-
-	assert(false);
-	return "(error)";
-}
-
-double wtransform(struct amatrix_t *amx,double x)
-{
-	switch(amx->config->type)
-	{
-		case SAMPLING_TYPE_STANDARD:
-		return fabs(x);
-	
-		case SAMPLING_TYPE_ONLYNEGATIVE:
-		return fnegative_part(x);
-	
-		case SAMPLING_TYPE_ONLYPOSITIVE:
-		return fpositive_part(x);
-
-		case SAMPLING_TYPE_HYBRID:
-
-		if(amx->pmxs[0]->dimensions==2)
-			return fnegative_part(x);
-		else
-			return fpositive_part(x);
-	}
-
-	assert(false);
-	return 0.0;
-}
 
 /*
 	The updates
@@ -86,16 +39,16 @@ int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int
 	return 0;
 }
 
-double extend_pdf(struct amatrix_t *amx,struct amatrix_weight_t *w)
+double extend_pdf(struct amatrix_t *amx,struct amatrix_weight_t *awt)
 {
-	double weight=reconstruct_weight(amx,w);
+	double weight=reconstruct_weight(amx, awt);
 
-	return wtransform(amx,weight);
+	return fabs(weight);
 }
 
 int update_extend(struct amatrix_t *amx, bool always_accept)
 {
-	double weightratio=1.0f/wtransform(amx,amatrix_weight(amx).weight);
+	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
 	double probability=1.0f;
 
 	if(amx->pmxs[0]->dimensions>=amx->config->maxorder)
@@ -143,29 +96,6 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
 	double *cdists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
 
-	bool use_jit=false;
-
-	typedef double (*FF)(struct energies_ctx_t *, int, int);
-	FF closure;
-	jit_context_t context;
-
-	if(use_jit==true)
-	{
-		context=jit_context_create();
-
-		jit_function_t jf=weight_to_jit(amx, &w, label1, label2, context);
-
-		/*
-			Compile (JIT) the function to machine code
-		*/
-
-		jit_context_build_start(context);
-		jit_function_compile(jf);
-		jit_context_build_end(context);
-
-		closure = (FF) jit_function_to_closure(jf);
-	}
-
 	for(int c=0;c<nr_states1;c++)
 	{
 		for(int d=0;d<nr_states2;d++)
@@ -174,30 +104,11 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 			assert(index==((index%nr_states1)+(index/nr_states1)*nr_states1));
 
-			if(use_jit==true)
-			{
-				dists[index]=wtransform(amx,closure(amx->ectx, 1+c, 1+d));
+			w.labels[label1].value=1+c;
+			w.labels[label2].value=1+d;
 
-#ifndef NDEBUG
-				w.labels[label1].value=1+c;
-				w.labels[label2].value=1+d;
-
-				assert(dists[index]==extend_pdf(amx, &w));
-#endif
-			}
-			else
-			{
-				w.labels[label1].value=1+c;
-				w.labels[label2].value=1+d;
-
-				dists[index]=extend_pdf(amx, &w);
-			}
+			dists[index]=extend_pdf(amx, &w);
 		}
-	}
-
-	if(use_jit==true)
-	{
-		jit_context_destroy(context);
 	}
 
 	normalize_distribution(dists,nr_states1*nr_states2);
@@ -241,7 +152,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	amx->cached_weight.weight=currentweight;
 	amx->cached_weight_is_valid=true;
 
-	weightratio*=wtransform(amx,currentweight);
+	weightratio*=fabs(currentweight);
 	acceptance_ratio=weightratio*probability;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
@@ -316,7 +227,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 {
 	struct amatrix_weight_t w=amatrix_weight(amx);
 
-	double weightratio=1.0f/wtransform(amx,w.weight);
+	double weightratio=1.0f/fabs(w.weight);
 	double probability=1.0f;
 
 	if(amx->pmxs[0]->dimensions<=amx->config->minorder)
@@ -367,7 +278,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=wtransform(amx,amatrix_weight(amx).weight);
+	weightratio*=fabs(amatrix_weight(amx).weight);
 	acceptance_ratio=weightratio*probability;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
@@ -395,7 +306,7 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	if(dimensions==1)
 		return UPDATE_UNPHYSICAL;
 
-	double weightratio=1.0f/wtransform(amx,amatrix_weight(amx).weight);
+	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
@@ -442,7 +353,7 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=wtransform(amx,amatrix_weight(amx).weight);
+	weightratio*=fabs(amatrix_weight(amx).weight);
 	acceptance_ratio=weightratio;
 	acceptance_ratio*=pow(amx->nr_occupied, update[QTYPE_OCCUPIED]);
 	acceptance_ratio*=pow(amx->nr_virtual, update[QTYPE_VIRTUAL]);
@@ -467,7 +378,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions>=1);
 
-	double weightratio=1.0f/wtransform(amx,amatrix_weight(amx).weight);
+	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
@@ -501,7 +412,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=wtransform(amx,amatrix_weight(amx).weight);
+	weightratio*=fabs(amatrix_weight(amx).weight);
 	acceptance_ratio=weightratio;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
@@ -615,7 +526,7 @@ int do_diagmc(struct configuration_t *config)
 	assert(config->maxorder<MAX_ORDER);
 
 	alps::alea::autocorr_acc<double> autocorrelation(1);
-	alps::alea::batch_acc<double> overall_sign, signs[MAX_ORDER], orders[MAX_ORDER];
+	alps::alea::batch_acc<double> overall_sign, signs[MAX_ORDER], plus[MAX_ORDER], minus[MAX_ORDER], orders[MAX_ORDER];
 
 	long int nr_samples, nr_physical_samples, nr_samples_by_order[MAX_ORDER], nr_positive_samples[MAX_ORDER], nr_negative_samples[MAX_ORDER];
 
@@ -741,7 +652,11 @@ int do_diagmc(struct configuration_t *config)
 				signs[order] << sign;
 
 				for(int c=0;c<MAX_ORDER;c++)
-					orders[c] << ((c!=order)?(0.0):(sign));
+				{
+					orders[c] << ((c!=order) ? (0.0) : (sign));
+					plus[c] << ((c!=order) ? (0.0) : (positive_part(sign)));
+					minus[c] << ((c!=order) ? (0.0) : (negative_part(sign)));
+				}
 
 				nr_samples_by_order[order]++;
 
@@ -797,8 +712,6 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Unphysical penalty: %f\n",config->unphysicalpenalty);
 	fprintf(out,"# Minimum order: %d\n",config->minorder);
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);
-	fprintf(out,"# Sampling type: %s\n",sampling_type_description(config->type));
-	fprintf(out,"# Epsilon (for Lindelöf resummation): %f\n",config->epsilon);
 	fprintf(out,"#\n");
 
 	fprintf(out,"# Iterations (done/planned): %ld/%ld\n",counter,config->iterations);
@@ -850,15 +763,21 @@ int do_diagmc(struct configuration_t *config)
 		Finally, we output the actual results.
 	*/
 
-	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Sign (from ALEA)>\n");
+	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Positive fraction> <Negative fraction> <Sign (from ALEA)>\n");
 
 	alps::alea::autocorr_result<double> result_autocorrelation=autocorrelation.finalize();
-	alps::alea::batch_result<double> result_overall_sign, result_signs[MAX_ORDER], result_orders[MAX_ORDER], result_lsigns[16][16],result_hsigns[16][16], result_lhsigns[16][16];
+	alps::alea::batch_result<double> result_overall_sign, result_signs[MAX_ORDER], result_plus[MAX_ORDER],result_minus[MAX_ORDER], result_orders[MAX_ORDER];
 
 	result_overall_sign=overall_sign.finalize();
 
 	for(int c=0;c<MAX_ORDER;c++)
 		result_signs[c]=signs[c].finalize();
+
+	for(int c=0;c<MAX_ORDER;c++)
+		result_plus[c]=plus[c].finalize();
+
+	for(int c=0;c<MAX_ORDER;c++)
+		result_minus[c]=minus[c].finalize();
 
 	for(int c=0;c<MAX_ORDER;c++)
 		result_orders[c]=orders[c].finalize();
@@ -887,6 +806,9 @@ int do_diagmc(struct configuration_t *config)
 			sign=NAN;
 
 		fprintf(out, "%d %ld %ld %f %f ", order, nr_positive_samples[order], nr_negative_samples[order], pct, sign);
+
+		fprintf(out,"%f+-%f %f+-%f ",result_plus[order].mean()(0),result_plus[order].stderror()(0),
+			                     result_minus[order].mean()(0),result_minus[order].stderror()(0));
 
 		/*
 			Remember that result_signs[order].mean() has type alps::alea::column

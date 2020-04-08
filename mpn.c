@@ -153,9 +153,7 @@ double reconstruct_weight(struct amatrix_t *amx,struct amatrix_weight_t *awt)
 
 	numerators*=awt->unphysical_penalty;
 
-	double lindeloef_factor=exp(amx->config->epsilon*awt->h*log(awt->h));
-
-	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators*lindeloef_factor;
+	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators;
 
 	return amx->config->bias+weight/amatrix_multiplicity(amx);
 }
@@ -390,17 +388,15 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		add_numerator(&ret,mels[i][0],mels[i][1],mels[i][2],mels[i][3]);
 	}
 
-	double lindeloef_factor=exp(amx->config->epsilon*h*log(h));
-
 	if(verbose==true)
-		printf("Final weight: %f\n",pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor);
+		printf("Final weight: %f\n",pow(inversefactor,-1.0f)*numerators/denominators);
 
 	/*
 		Finally we put all the results into an 'amatrix_weight_t' struct and
 		we return it.
 	*/
 
-	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators*lindeloef_factor;
+	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators;
 	ret.l=l;
 	ret.h=h;
 	ret.inversefactor=inversefactor;
