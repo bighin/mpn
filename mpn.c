@@ -99,7 +99,7 @@ void add_unphysical_penalty(struct amatrix_weight_t *awt,double penalty)
 	awt->unphysical_penalty*=penalty;
 }
 
-double reconstruct_weight(struct amatrix_t *amx,struct amatrix_weight_t *awt)
+double reconstruct_single_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
 {
 	/*
 		Keep in mind that here we do not check for connectedness.
@@ -153,9 +153,14 @@ double reconstruct_weight(struct amatrix_t *amx,struct amatrix_weight_t *awt)
 
 	numerators*=awt->unphysical_penalty;
 
-	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators;
+	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
 
-	return amx->config->bias+weight/amatrix_multiplicity(amx);
+	return weight;
+}
+
+double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
+{
+	return reconstruct_single_weight(amx,awt);
 }
 
 /*
@@ -396,7 +401,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		we return it.
 	*/
 
-	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators;
+	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
 	ret.l=l;
 	ret.h=h;
 	ret.inversefactor=inversefactor;
@@ -405,7 +410,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	ret.ilabels=*ilabels;
 
 	if(fabs(ret.weight)>1e-4)
-		assert(gsl_fcmp(amx->config->bias+ret.weight/amatrix_multiplicity(amx),reconstruct_weight(amx,&ret),1e-8)==0);
+		assert(gsl_fcmp(ret.weight, reconstruct_single_weight(amx, &ret), 1e-8)==0);
 
 	return ret;
 }

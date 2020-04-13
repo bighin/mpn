@@ -708,7 +708,6 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Output file is '%s'\n",output);
 	fprintf(out,"# Binary compiled from git commit %s\n",GITCOMMIT);
 	fprintf(out,"#\n");
-	fprintf(out,"# Bias: %f\n",config->bias);
 	fprintf(out,"# Unphysical penalty: %f\n",config->unphysicalpenalty);
 	fprintf(out,"# Minimum order: %d\n",config->minorder);
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);

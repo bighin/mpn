@@ -50,10 +50,6 @@ int configuration_handler(void *user,const char *section,const char *name,const 
 		else
 			return 0;
 	}
-	else if(MATCH("parameters","bias"))
-	{
-		pconfig->bias=atof(value);
-	}
 	else if(MATCH("parameters","unphysicalpenalty"))
 	{
 		pconfig->unphysicalpenalty=atof(value);
@@ -98,7 +94,6 @@ void load_config_defaults(struct configuration_t *config)
 	config->erisfile=NULL;
 	config->seedrng=true;
 
-	config->bias=0.0f;
 	config->unphysicalpenalty=0.01f;
 	config->minorder=1;
 	config->minorder=16;

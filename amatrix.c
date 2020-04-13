@@ -409,7 +409,7 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 		Dimension 1 is a special case that does not need the evaluation
 		of the incidence matrix.
 
-		Note that dimension 1 corresponds to the Hartree-Fock energy.
+		Note that dimension 1 (a bit unexpectedly) corresponds to the Hartree-Fock energy.
 	*/
 
 	if(amx->pmxs[0]->dimensions==1)
@@ -428,7 +428,7 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 
 		multiplicity=1.0f;
 
-		amx->cached_weight.weight=amx->config->bias+weight/multiplicity;
+		amx->cached_weight.weight=weight/multiplicity;
 		amx->cached_weight.l=0;
 		amx->cached_weight.h=2;
 		amx->cached_weight_is_valid=true;
@@ -441,8 +441,6 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, ret.labels, &ret.ilabels);
 	ret=incidence_to_weight(incidence, ret.labels, &ret.ilabels, amx);
 	gsl_matrix_int_free(incidence);
-
-	ret.weight=amx->config->bias+ret.weight/amatrix_multiplicity(amx);
 
 	amx->cached_weight=ret;
 	amx->cached_weight_is_valid=true;

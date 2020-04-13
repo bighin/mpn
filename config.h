@@ -14,7 +14,6 @@ struct configuration_t
 
 	/* "parameters" section */
 
-	double bias;
 	double unphysicalpenalty;
 	int minorder,maxorder;
 
