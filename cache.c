@@ -22,8 +22,8 @@ bool amatrix_cache_is_enabled=true;
 	The function amatrix_to_index(), given a amatrix_t struct, returns a unique index,
 	representative of the arrangement of the zero/non-zero entries.
 
-	Keep in mind that there's nothing about the quantum numbers, since it would be
-	so expensive to cache that information. Because of this we cannot cache the weight,
+	Note that there's nothing about the quantum numbers, since it would be
+	too expensive to cache that information. Because of this we cannot cache the weight,
 	that depends on the quantum numbers.
 */
 
@@ -53,7 +53,7 @@ int cache_largest_index(int dimensions)
 	The multiplicity can take only values that are powers of two, and working
 	with matrices of dimension at most 6, the maximum value is 8.
 
-	Here we convert the double value return by amatrix_multiplicity to an int.
+	Here we convert the double value returned by amatrix_multiplicity to an int.
 */
 
 int multiplicity_to_int(double multiplicity)
@@ -249,6 +249,13 @@ int cached_amatrix_multiplicity(struct amatrix_t *amx)
 	uint8_t result=cache_get_entry(amatrix_to_index(amx), dimensions);
 
 	/*
+		If the cmatrix is too big, the multiplicity will not
+		fit in only three bits.
+	*/
+
+	assert(amx->pmxs[0]->dimensions<=6);
+
+	/*
 		The lowest three bits contain multiplicity-1
 	*/
 
@@ -261,6 +268,13 @@ bool cached_amatrix_check_connectedness(struct amatrix_t *amx)
 	int dimensions=amx->pmxs[0]->dimensions;
 
 	uint8_t result=cache_get_entry(amatrix_to_index(amx), dimensions);
+
+	/*
+		If the cmatrix is too big, the multiplicity will not
+		fit in only three bits.
+	*/
+
+	assert(amx->pmxs[0]->dimensions<=6);
 
 	/*
 		The connectedness information is in the fourth bit.

@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include <gsl/gsl_math.h>
+#include <gsl/gsl_rng.h>
 
 #include "auxx.h"
 
@@ -65,6 +65,7 @@ int ipow(int base,int exp)
 	{
 		if (exp&1)
 			result *= base;
+
 		exp>>=1;
 
 		if (!exp)

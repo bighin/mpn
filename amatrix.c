@@ -363,6 +363,11 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 {
 	int dimensions=amx->pmxs[0]->dimensions;
 
+	if(dimensions==1)
+	{
+		return true;
+	}
+
 	if((dimensions>1)&&(dimensions<=amatrix_cache_max_dimensions)&&(amatrix_cache_is_enabled==true))
 	{
 		assert(cached_amatrix_check_connectedness(amx)==actual_amatrix_check_connectedness(amx));
@@ -435,15 +440,20 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 
 		return amx->cached_weight;
 	}
+	else
+	{
+		struct amatrix_weight_t ret;
 
-	struct amatrix_weight_t ret;
+		gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, ret.labels, &ret.ilabels);
+		ret=incidence_to_weight(incidence, ret.labels, &ret.ilabels, amx);
+		gsl_matrix_int_free(incidence);
 
-	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, ret.labels, &ret.ilabels);
-	ret=incidence_to_weight(incidence, ret.labels, &ret.ilabels, amx);
-	gsl_matrix_int_free(incidence);
+		amx->cached_weight=ret;
+		amx->cached_weight_is_valid=true;
 
-	amx->cached_weight=ret;
-	amx->cached_weight_is_valid=true;
+		return ret;
+	}
 
-	return ret;
+	assert(false);
+	return 0.0f;
 }
