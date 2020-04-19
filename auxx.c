@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include <gsl/gsl_math.h>
 #include <gsl/gsl_rng.h>
 
 #include "auxx.h"

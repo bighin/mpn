@@ -455,5 +455,7 @@ struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
 	}
 
 	assert(false);
-	return 0.0f;
+
+	struct amatrix_weight_t ret={0.0,0,0};
+	return ret;
 }
