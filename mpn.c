@@ -174,7 +174,11 @@ double reconstruct_weight(struct amatrix_t *amx,struct amatrix_weight_t *awt)
 	struct permutation_collection_t *pct=identify_twins(amx,awt,&is_representative,&combinatorial);
 
 	if(is_representative==false)
+	{
+		fini_permutation_collection(pct);
+
 		return 0.0f;
+	}
 
 	while(go_to_next_permutation(pct,awt)==true)
 	{
