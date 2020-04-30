@@ -11,6 +11,7 @@
 #include "auxx.h"
 #include "loaderis.h"
 #include "multiplicity.h"
+#include "twins.h"
 
 /*
 	For this function and the next one, see Szabo-Ostlund, page 360.
@@ -158,9 +159,45 @@ double reconstruct_single_weight(struct amatrix_t *amx, struct amatrix_weight_t 
 	return weight;
 }
 
-double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
+double old_reconstruct_weight(struct amatrix_t *amx,struct amatrix_weight_t *awt)
 {
 	return reconstruct_single_weight(amx,awt);
+}
+
+double reconstruct_weight(struct amatrix_t *amx,struct amatrix_weight_t *awt)
+{
+	double ret=0.0f,Rdenominator=0.0f;
+
+	bool is_representative=true;
+	int combinatorial=1,nonzero=0;
+
+	struct permutation_collection_t *pct=identify_twins(amx,awt,&is_representative,&combinatorial);
+
+	if(is_representative==false)
+		return 0.0f;
+
+	while(go_to_next_permutation(pct,awt)==true)
+	{
+		double thisweight=reconstruct_single_weight(amx,awt);
+
+		ret+=thisweight;
+		Rdenominator+=fabs(thisweight);
+
+		if(fabs(thisweight)>1e-8)
+			nonzero++;
+	}
+
+	if((pct->ipairs>=2)&&(nonzero>=2))
+	{
+		double R=fabs(ret)/Rdenominator;
+
+		//char *banner=(amatrix_is_physical(amx)==true)?("physical"):("unphysical");
+		//printf("%f [%s]\n", R, banner);
+	}
+
+	fini_permutation_collection(pct);
+
+	return ret/((double)(combinatorial));
 }
 
 /*
@@ -401,16 +438,13 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		we return it.
 	*/
 
-	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
-	ret.l=l;
-	ret.h=h;
-	ret.inversefactor=inversefactor;
-
 	memcpy(ret.labels,labels,sizeof(struct label_t)*MAX_LABELS);
 	ret.ilabels=*ilabels;
 
-	if(fabs(ret.weight)>1e-4)
-		assert(gsl_fcmp(ret.weight, reconstruct_single_weight(amx, &ret), 1e-8)==0);
+	ret.l=l;
+	ret.h=h;
+	ret.inversefactor=inversefactor;
+	ret.weight=reconstruct_weight(amx,&ret);
 
 	return ret;
 }
