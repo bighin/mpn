@@ -14,6 +14,6 @@ extern int permutations4[24][4];
 extern int permutations5[120][5];
 extern int permutations6[720][6];
 
-void fisher_yates(gsl_rng *rng_ctx, int *array, int length)
+void fisher_yates(gsl_rng *rng_ctx, int *array, int length);
 
 #endif //__PERMUTATIONS_H__

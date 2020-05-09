@@ -22,6 +22,7 @@ extern "C" {
 #include "auxx.h"
 #include "mpn.h"
 #include "config.h"
+#include "permutations.h"
 
 #include "libprogressbar/progressbar.h"
 
