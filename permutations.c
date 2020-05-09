@@ -1,4 +1,5 @@
 #include <gsl/gsl_matrix.h>
+#include <gsl/gsl_rng.h>
 #include <assert.h>
 
 #include "permutations.h"
@@ -13,7 +14,7 @@
 	The algorithm is adapted from: http://www.geekviewpoint.com/java/numbers/permutation_index
 */
 
-int get_permutation_index(int *permutation,int length)
+int get_permutation_index(const int *permutation,int length)
 {
 	int index=0;
 
@@ -89,5 +90,21 @@ void pmatrix_to_permutation(struct pmatrix_t *m,int *permutation)
 				break;
 			}
 		}
+	}
+}
+
+/*
+	The Fisher-Yates algorithm generates a random permutation
+*/
+
+void fisher_yates(gsl_rng *rng_ctx, int *array, int length)
+{
+	for(int c=length-1;c>0;c--)
+	{
+		int d=gsl_rng_uniform_int(rng_ctx, c);
+
+		int tmp=array[d];
+		array[d]=array[c];
+		array[c]=tmp;
 	}
 }

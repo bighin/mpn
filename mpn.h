@@ -28,7 +28,6 @@ struct amatrix_t;
 
 struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx);
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels);
-double reconstruct_single_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt);
 double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt);
 
 #endif //__MPN_H__

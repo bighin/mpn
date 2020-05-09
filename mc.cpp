@@ -426,6 +426,97 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
+int update_swap(struct amatrix_t *amx, bool always_accept)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
+	assert(amx->pmxs[0]->dimensions>=1);
+
+	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
+
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
+
+	/*
+		Do we play with virtual or with occupied states?
+	*/
+
+	int target_type=(gsl_rng_uniform_int(amx->rng_ctx, 2)==0) ? (QTYPE_OCCUPIED) : (QTYPE_VIRTUAL);
+
+	struct
+	{
+		int i,j,pmatrix;
+	}
+	candidates[32];
+
+	int icandidates=0;
+
+	for(int i=0;i<dimensions;i++)
+	{
+		for(int j=0;j<dimensions;j++)
+		{
+			if(pmatrix_entry_type(i,j)==target_type)
+			{
+				if(pmatrix_get_entry(amx->pmxs[0],i,j)!=0)
+				{
+					candidates[icandidates].i=i;
+					candidates[icandidates].j=j;
+					candidates[icandidates].pmatrix=0;
+					icandidates++;
+				}
+
+				if(pmatrix_get_entry(amx->pmxs[1],i,j)!=0)
+				{
+					candidates[icandidates].i=i;
+					candidates[icandidates].j=j;
+					candidates[icandidates].pmatrix=1;
+					icandidates++;
+				}
+			}
+		}
+	}
+
+	if(icandidates<2)
+		return UPDATE_UNPHYSICAL;
+
+	int values[32];
+
+	for(int c=0;c<icandidates;c++)
+		values[c]=pmatrix_get_entry(amx->pmxs[candidates[c].pmatrix],candidates[c].i,candidates[c].j);
+
+	/*
+		TODO: Probably it would be better to use perfect probability distributions.
+	*/
+
+	fisher_yates(amx->rng_ctx,values,icandidates);
+
+	for(int c=0;c<icandidates;c++)
+		pmatrix_set_entry(amx->pmxs[candidates[c].pmatrix],candidates[c].i,candidates[c].j,values[c]);
+
+	amx->cached_weight_is_valid=false;
+
+	/*
+		The update is balanced with itself, the acceptance ratio is simply given
+		by the (modulus of the) weights ratio.
+	*/
+
+	double acceptance_ratio;
+
+	weightratio*=fabs(amatrix_weight(amx).weight);
+	acceptance_ratio=weightratio;
+
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+
+	if((is_accepted==false)&&(always_accept==false))
+	{
+		amatrix_restore(amx, &backup);
+		return UPDATE_REJECTED;
+	}
+
+	return UPDATE_ACCEPTED;
+}
+
 /*
 	Auxiliary functions
 */
@@ -475,7 +566,7 @@ void interrupt_handler(int dummy __attribute__((unused)))
 int do_diagmc(struct configuration_t *config)
 {
 
-#define DIAGRAM_NR_UPDATES        (4)
+#define DIAGRAM_NR_UPDATES        (5)
 
 	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx, bool always_accept);
 	const char *update_names[DIAGRAM_NR_UPDATES];
@@ -491,16 +582,19 @@ int do_diagmc(struct configuration_t *config)
 	updates[1]=update_squeeze;
 	updates[2]=update_shuffle;
 	updates[3]=update_modify;
+	updates[4]=update_swap;
 
 	update_names[0]="Extend";
 	update_names[1]="Squeeze";
 	update_names[2]="Shuffle";
 	update_names[3]="Modify";
+	update_names[4]="Swap";
 
 	update_probability[0]=1;
 	update_probability[1]=1;
 	update_probability[2]=1;
 	update_probability[3]=1;
+	update_probability[4]=1;
 
 	/*
 		Here we calculate the cumulative probabilities from the update probabilities.

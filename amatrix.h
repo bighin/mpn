@@ -50,6 +50,12 @@ struct amatrix_weight_t
 
 	struct label_t labels[MAX_LABELS];
 	int ilabels;
+
+	/*
+		The excitation level of the diagram: 2 for doubles, 3 for triples, etc...
+	*/
+
+	int excitation_level;
 };
 
 /*

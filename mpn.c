@@ -11,7 +11,6 @@
 #include "auxx.h"
 #include "loaderis.h"
 #include "multiplicity.h"
-#include "twins.h"
 
 /*
 	For this function and the next one, see Szabo-Ostlund, page 360.
@@ -100,7 +99,7 @@ void add_unphysical_penalty(struct amatrix_weight_t *awt,double penalty)
 	awt->unphysical_penalty*=penalty;
 }
 
-double reconstruct_single_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
+double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
 {
 	/*
 		Keep in mind that here we do not check for connectedness.
@@ -157,51 +156,6 @@ double reconstruct_single_weight(struct amatrix_t *amx, struct amatrix_weight_t 
 	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
 
 	return weight;
-}
-
-double old_reconstruct_weight(struct amatrix_t *amx,struct amatrix_weight_t *awt)
-{
-	return reconstruct_single_weight(amx,awt);
-}
-
-double reconstruct_weight(struct amatrix_t *amx,struct amatrix_weight_t *awt)
-{
-	double ret=0.0f,Rdenominator=0.0f;
-
-	bool is_representative=true;
-	int combinatorial=1,nonzero=0;
-
-	struct permutation_collection_t *pct=identify_twins(amx,awt,&is_representative,&combinatorial);
-
-	if(is_representative==false)
-	{
-		fini_permutation_collection(pct);
-
-		return 0.0f;
-	}
-
-	while(go_to_next_permutation(pct,awt)==true)
-	{
-		double thisweight=reconstruct_single_weight(amx,awt);
-
-		ret+=thisweight;
-		Rdenominator+=fabs(thisweight);
-
-		if(fabs(thisweight)>1e-8)
-			nonzero++;
-	}
-
-	if((pct->ipairs>=2)&&(nonzero>=2))
-	{
-		double R=fabs(ret)/Rdenominator;
-
-		//char *banner=(amatrix_is_physical(amx)==true)?("physical"):("unphysical");
-		//printf("%f [%s]\n", R, banner);
-	}
-
-	fini_permutation_collection(pct);
-
-	return ret/((double)(combinatorial));
 }
 
 /*
@@ -303,6 +257,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	*/
 
 	double denominators=1.0f;
+	int excitation_level=0;
 
 	for(size_t i=0;i<(B->size1-1);i++)
 	{
@@ -354,11 +309,20 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		{
 			denominators*=denominator;
 			ret.nr_denominators++;
+
+			/*
+				The excitation level of the diagram corresponds to the
+				larger number of energies in a denominator, divided by two.
+			*/
+
+			excitation_level=MAX(excitation_level,energies_in_denominator/2);
 		}
 
 		if(verbose==true)
 			printf("}\n");
 	}
+
+	ret.excitation_level=excitation_level;
 
 	/*
 		Additional rule: phase factor
