@@ -16,6 +16,7 @@ struct configuration_t
 
 	double unphysicalpenalty;
 	int minorder,maxorder;
+	double epsilon;
 
 	/* "sampling" section */
 

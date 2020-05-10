@@ -591,6 +591,8 @@ int do_diagmc(struct configuration_t *config)
 	update_names[3]="Modify";
 	update_names[4]="Swap";
 
+#warning Looks like something is wrong with cumulative probabilities, let us fix it!
+
 	update_probability[0]=1;
 	update_probability[1]=1;
 	update_probability[2]=1;
@@ -622,6 +624,10 @@ int do_diagmc(struct configuration_t *config)
 
 	alps::alea::autocorr_acc<double> autocorrelation(1);
 	alps::alea::batch_acc<double> overall_sign, signs[MAX_ORDER], plus[MAX_ORDER], minus[MAX_ORDER], orders[MAX_ORDER];
+
+#define	MAX_EXCITATIONS (16)
+
+	alps::alea::batch_acc<double> excitations[MAX_EXCITATIONS];
 
 	long int nr_samples, nr_physical_samples, nr_samples_by_order[MAX_ORDER], nr_positive_samples[MAX_ORDER], nr_negative_samples[MAX_ORDER];
 
@@ -753,6 +759,12 @@ int do_diagmc(struct configuration_t *config)
 					minus[c] << ((c!=order) ? (0.0) : (negative_part(sign)));
 				}
 
+				{
+					int excitation_level=(order<=2)?(0):(ws.excitation_level);
+
+					excitations[excitation_level] << sign;
+				}
+
 				nr_samples_by_order[order]++;
 
 				if(ws.weight>=0.0)
@@ -806,6 +818,7 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Unphysical penalty: %f\n",config->unphysicalpenalty);
 	fprintf(out,"# Minimum order: %d\n",config->minorder);
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);
+	fprintf(out,"# Epsilon (for Lindelöf resummation): %f\n",config->epsilon);
 	fprintf(out,"#\n");
 
 	fprintf(out,"# Iterations (done/planned): %ld/%ld\n",counter,config->iterations);
@@ -861,6 +874,7 @@ int do_diagmc(struct configuration_t *config)
 
 	alps::alea::autocorr_result<double> result_autocorrelation=autocorrelation.finalize();
 	alps::alea::batch_result<double> result_overall_sign, result_signs[MAX_ORDER], result_plus[MAX_ORDER],result_minus[MAX_ORDER], result_orders[MAX_ORDER];
+	alps::alea::batch_result<double> result_excitations[MAX_EXCITATIONS];
 
 	result_overall_sign=overall_sign.finalize();
 
@@ -875,6 +889,9 @@ int do_diagmc(struct configuration_t *config)
 
 	for(int c=0;c<MAX_ORDER;c++)
 		result_orders[c]=orders[c].finalize();
+
+	for(int c=0;c<MAX_EXCITATIONS;c++)
+		result_excitations[c]=excitations[c].finalize();
 
 	long int total_positive,total_negative;
 
@@ -948,6 +965,11 @@ int do_diagmc(struct configuration_t *config)
 
 			fprintf(out,"%s/%s %f +- %f (%f%%)\n", desc1, desc2, ratio, sigmaratio, 100.0f*sigmaratio/ratio);
 		}
+	}
+
+	for(int c=0;c<MAX_EXCITATIONS;c++)
+	{
+		fprintf(out,"Excitation level(%d): %f +- %f\n",c,result_excitations[c].mean()(0),result_excitations[c].stderror()(0));
 	}
 
 	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));

@@ -62,6 +62,10 @@ int configuration_handler(void *user,const char *section,const char *name,const 
 	{
 		pconfig->maxorder=atoi(value);
 	}
+	else if(MATCH("parameters","epsilon"))
+	{
+		pconfig->epsilon=atof(value);
+	}
 	else if(MATCH("sampling","iterations"))
 	{
 		pconfig->iterations=(long int)(strtol(value,(char **)NULL,10));
@@ -96,7 +100,8 @@ void load_config_defaults(struct configuration_t *config)
 
 	config->unphysicalpenalty=0.01f;
 	config->minorder=1;
-	config->minorder=16;
+	config->minorder=8;
+	config->epsilon=0.1f;
 
 	config->iterations=10000000;
 	config->thermalization=config->iterations/100;

@@ -11,6 +11,7 @@
 #include "auxx.h"
 #include "loaderis.h"
 #include "multiplicity.h"
+#include "cache.h"
 
 /*
 	For this function and the next one, see Szabo-Ostlund, page 360.
@@ -155,7 +156,12 @@ double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
 
 	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
 
-	return weight;
+	/*
+		Lindelöf resummation happens here.
+	*/
+
+	int index=1+amatrix_to_index(amx)%7;
+	return weight*exp(amx->config->epsilon*(index)*log(index));
 }
 
 /*
@@ -412,6 +418,18 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	ret.l=l;
 	ret.h=h;
 	ret.inversefactor=inversefactor;
+
+	/*
+		At the very end, the ret structure contains all the informations needed to calculate
+		the weight, and the weight itself is given by pow(inversefactor,-1.0f)*numerators/denominators
+
+		Rather than just using this value, we invoke reconstruct_weight() since one might want
+		to associate group diagrams in pairs according to symmetries, and reconstruct_weight()
+		is the most natural place of doing so quite transparently.
+
+		Note that once the ret structure is filled, call to reconstruct_weight() is quite cheap.
+	*/
+
 	ret.weight=reconstruct_weight(amx,&ret);
 
 	return ret;
