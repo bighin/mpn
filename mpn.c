@@ -12,6 +12,7 @@
 #include "loaderis.h"
 #include "multiplicity.h"
 #include "cache.h"
+#include "permutations.h"
 
 /*
 	For this function and the next one, see Szabo-Ostlund, page 360.
@@ -100,7 +101,7 @@ void add_unphysical_penalty(struct amatrix_weight_t *awt,double penalty)
 	awt->unphysical_penalty*=penalty;
 }
 
-double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
+double reconstruct_single_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
 {
 	/*
 		Keep in mind that here we do not check for connectedness.
@@ -156,12 +157,22 @@ double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
 
 	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
 
+#warning Cleanup or modify this
+
 	/*
-		Lindelöf resummation happens here.
+		Lindelöf resummation should happen here, as
+
+		return weight*exp(amx->config->epsilon*(charge)*log(charge))
+
+		for an appropriate Lindelöf charge.
 	*/
 
-	int index=1+amatrix_to_index(amx)%7;
-	return weight*exp(amx->config->epsilon*(index)*log(index));
+	return weight;
+}
+
+double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
+{
+	return reconstruct_single_weight(amx,awt);
 }
 
 /*
@@ -321,6 +332,8 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 				larger number of energies in a denominator, divided by two.
 			*/
 
+#warning This might be wrong!
+
 			excitation_level=MAX(excitation_level,energies_in_denominator/2);
 		}
 
@@ -430,7 +443,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		Note that once the ret structure is filled, call to reconstruct_weight() is quite cheap.
 	*/
 
-	ret.weight=reconstruct_weight(amx,&ret);
+	ret.weight=reconstruct_single_weight(amx,&ret);
 
 	return ret;
 }
