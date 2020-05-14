@@ -591,13 +591,18 @@ int do_diagmc(struct configuration_t *config)
 	update_names[3]="Modify";
 	update_names[4]="Swap";
 
-#warning Looks like something is wrong with cumulative probabilities, let us fix it!
+	/*
+		Update probabilities: note that they must be the same for symmetric updates,
+		see the assert() below.
+	*/
 
 	update_probability[0]=1;
 	update_probability[1]=1;
 	update_probability[2]=1;
 	update_probability[3]=1;
 	update_probability[4]=1;
+
+	assert(update_probability[0]==update_probability[1]);
 
 	/*
 		Here we calculate the cumulative probabilities from the update probabilities.
