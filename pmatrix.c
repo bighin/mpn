@@ -14,7 +14,7 @@ struct pmatrix_t *init_pmatrix(int nr_occupied,int nr_virtual,gsl_rng *rngctx)
 
 	assert(ret);
 
-	ret->dimensions=1;
+	ret->dimensions=2;
 	ret->nr_occupied=nr_occupied;
 	ret->nr_virtual=nr_virtual;
 
@@ -46,7 +46,16 @@ int pmatrix_get_entry(struct pmatrix_t *pmx, int i, int j)
 	assert((j>=0)&&(j<pmx->dimensions));
 	assert(pmx->values[i][j]>=0);
 
-	return pmx->values[i][j];
+	if(pmx->values[i][j]==0)
+		return 0;
+
+	if(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL)
+		return 1+((pmx->values[i][j]-1)%pmx->nr_virtual);
+	else if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
+		return 1+((pmx->values[i][j]-1)%pmx->nr_occupied);
+
+	assert(false);
+	return 0;
 }
 
 void pmatrix_set_entry(struct pmatrix_t *pmx, int i, int j, int value)
@@ -56,29 +65,31 @@ void pmatrix_set_entry(struct pmatrix_t *pmx, int i, int j, int value)
 	assert(pmx->values[i][j]>=0);
 	assert(value>=0);
 
+	if(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL)
+		assert(value<=pmx->nr_virtual);
+	else if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
+		assert(value<=pmx->nr_occupied);
+
 	pmx->values[i][j]=value;
 }
 
-void pmatrix_inc_entry(struct pmatrix_t *pmx, int i, int j)
+int pmatrix_get_raw_entry(struct pmatrix_t *pmx, int i, int j)
 {
 	assert((i>=0)&&(i<pmx->dimensions));
 	assert((j>=0)&&(j<pmx->dimensions));
+	assert(pmx->values[i][j]>=0);
 
-	pmx->values[i][j]++;
-
-	int value=pmx->values[i][j];
-	assert((value==0)||(value==1)||(value==2));
+	return pmx->values[i][j];
 }
 
-void pmatrix_dec_entry(struct pmatrix_t *pmx, int i, int j)
+void pmatrix_set_raw_entry(struct pmatrix_t *pmx, int i, int j, int value)
 {
 	assert((i>=0)&&(i<pmx->dimensions));
 	assert((j>=0)&&(j<pmx->dimensions));
+	assert(pmx->values[i][j]>=0);
+	assert(value>=0);
 
-	pmx->values[i][j]--;
-
-	int value=pmx->values[i][j];
-	assert((value==0)||(value==1)||(value==2));
+	pmx->values[i][j]=value;
 }
 
 void pmatrix_print(struct pmatrix_t *pmx)
@@ -94,36 +105,6 @@ void pmatrix_print(struct pmatrix_t *pmx)
 	}
 
 	fflush(stdout);
-}
-
-int pmatrix_sum_row(struct pmatrix_t *pmx, int row)
-{
-	int ret=0;
-
-	for(int c=0;c<pmx->dimensions;c++)
-		ret+=pmatrix_get_entry(pmx, row, c);
-
-	return ret;
-}
-
-int pmatrix_sum_column(struct pmatrix_t *pmx, int column)
-{
-	int ret=0;
-
-	for(int c=0;c<pmx->dimensions;c++)
-		ret+=pmatrix_get_entry(pmx, c, column);
-
-	return ret;
-}
-
-int pmatrix_trace(struct pmatrix_t *pmx)
-{
-	int ret=0;
-
-	for(int c=0;c<pmx->dimensions;c++)
-		ret+=pmatrix_get_entry(pmx, c, c);
-
-	return ret;
 }
 
 double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj)
@@ -327,16 +308,16 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx)
 	int newvalue=-1;
 
 	if(pmatrix_entry_type(i, pmx->dimensions-1)==pmatrix_entry_type(i,j))
-		newvalue=pmatrix_get_entry(pmx, i, pmx->dimensions-1);
+		newvalue=pmatrix_get_raw_entry(pmx, i, pmx->dimensions-1);
 	else if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
-		newvalue=pmatrix_get_entry(pmx, pmx->dimensions-1, j);
+		newvalue=pmatrix_get_raw_entry(pmx, pmx->dimensions-1, j);
 
 	assert(newvalue!=-1);
 
 	pmatrix_set_entry(pmx, i, pmx->dimensions-1, 0);
 	pmatrix_set_entry(pmx, pmx->dimensions-1, j, 0);
 
-	pmatrix_set_entry(pmx, i, j, newvalue);
+	pmatrix_set_raw_entry(pmx, i, j, newvalue);
 
 	pmx->dimensions--;
 
@@ -461,10 +442,10 @@ void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int
 
 	for(int j=0;j<pmx->dimensions;j++)
 	{
-		int tmp=pmatrix_get_entry(pmx, i1, j);
+		int tmp=pmatrix_get_raw_entry(pmx, i1, j);
 
-		pmatrix_set_entry(pmx, i1, j, pmatrix_get_entry(pmx, i2, j));
-		pmatrix_set_entry(pmx, i2, j, tmp);
+		pmatrix_set_raw_entry(pmx, i1, j, pmatrix_get_raw_entry(pmx, i2, j));
+		pmatrix_set_raw_entry(pmx, i2, j, tmp);
 	}
 
 	assert(pmatrix_check_consistency(pmx)==true);
@@ -583,10 +564,10 @@ void pmatrix_swap_cols(struct pmatrix_t *pmx, int j1, int j2, int update[2], int
 
 	for(int i=0;i<pmx->dimensions;i++)
 	{
-		int tmp=pmatrix_get_entry(pmx, i, j1);
+		int tmp=pmatrix_get_raw_entry(pmx, i, j1);
 
-		pmatrix_set_entry(pmx, i, j1, pmatrix_get_entry(pmx, i, j2));
-		pmatrix_set_entry(pmx, i, j2, tmp);
+		pmatrix_set_raw_entry(pmx, i, j1, pmatrix_get_raw_entry(pmx, i, j2));
+		pmatrix_set_raw_entry(pmx, i, j2, tmp);
 	}
 
 	assert(pmatrix_check_consistency(pmx)==true);
@@ -651,20 +632,7 @@ int pmatrix_entry_type(int i,int j)
 	return QTYPE_VIRTUAL;
 }
 
-int pmatrix_get_new_occupied_value(struct pmatrix_t *pmx, gsl_rng *rngctx)
-{
-	return 1+gsl_rng_uniform_int(rngctx, pmx->nr_occupied);
-}
-
-int pmatrix_get_new_virtual_value(struct pmatrix_t *pmx, gsl_rng *rngctx)
-{
-	return 1+gsl_rng_uniform_int(rngctx, pmx->nr_virtual);
-}
-
 int pmatrix_get_new_value(struct pmatrix_t *pmx, gsl_rng *rngctx, int i, int j)
 {
-	if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
-		return pmatrix_get_new_occupied_value(pmx, rngctx);
-
-	return pmatrix_get_new_virtual_value(pmx, rngctx);
+	return 1+gsl_rng_uniform_int(rngctx, pmx->nr_occupied*pmx->nr_virtual);
 }

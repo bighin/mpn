@@ -47,6 +47,32 @@ double extend_pdf(struct amatrix_t *amx,struct amatrix_weight_t *awt)
 	return fabs(weight);
 }
 
+void pmatrix_set_entry_with_distribution(struct pmatrix_t *pmx, int i, int j, int value, gsl_rng *rngctx)
+{
+	if(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL)
+	{
+		int actualvalue=value+pmx->nr_virtual*gsl_rng_uniform_int(rngctx, pmx->nr_occupied);
+
+		pmatrix_set_entry(pmx,i,j,actualvalue);
+
+		assert(pmatrix_get_entry(pmx,i,j)==value);
+		assert((actualvalue>=1)&&(actualvalue<=(pmx->nr_virtual*pmx->nr_occupied)));
+		return;
+	}
+	else if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
+	{
+		int actualvalue=value+pmx->nr_occupied*gsl_rng_uniform_int(rngctx, pmx->nr_virtual);
+
+		pmatrix_set_entry(pmx,i,j,actualvalue);
+
+		assert(pmatrix_get_entry(pmx,i,j)==value);
+		assert((actualvalue>=1)&&(actualvalue<=(pmx->nr_virtual*pmx->nr_occupied)));
+		return;
+	}
+
+	assert(false);
+}
+
 int update_extend(struct amatrix_t *amx, bool always_accept)
 {
 	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
@@ -130,8 +156,8 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	assert(index==(c+d*nr_states1));
 	assert(cdist_search(cdists, 0, nr_states1*nr_states2, selector)==cdist_linear_search(cdists, 0, nr_states1*nr_states2, selector));
 
-	pmatrix_set_entry(amx->pmxs[0],i1,j1,1+c);
-	pmatrix_set_entry(amx->pmxs[1],i2,j2,1+d);
+	pmatrix_set_entry_with_distribution(amx->pmxs[0], i1, j1, 1+c, amx->rng_ctx);
+	pmatrix_set_entry_with_distribution(amx->pmxs[1], i2, j2, 1+d, amx->rng_ctx);
 	amx->cached_weight_is_valid=false;
 
 	w.labels[label1].value=1+c;
@@ -742,6 +768,27 @@ int do_diagmc(struct configuration_t *config)
 		}
 
 		nr_samples++;
+
+		if(false)
+		{
+			printf("================================\n");
+			amatrix_print(amx);
+			printf("--------------------------------\n");
+			pmatrix_print(amx->pmxs[0]);
+			printf("--------------------------------\n");
+			pmatrix_print(amx->pmxs[1]);
+			printf("--------------------------------\n");
+
+			if(amatrix_is_physical(amx)==true)
+				printf("PHYSICAL\n");
+			else
+				printf("UNPHYSICAL\n");
+
+			printf("================================\n");
+
+			char nil[1024];
+			gets(nil);
+		}
 
 		if(amatrix_is_physical(amx))
 		{
