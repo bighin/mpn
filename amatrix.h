@@ -5,58 +5,9 @@
 #include <gsl/gsl_rng.h>
 
 #include "pmatrix.h"
-#include "loaderis.h"
 #include "config.h"
 #include "limits.h"
-#include "mpn.h"
-
-/*
-	This structure saves the result of the evaluation of the weight of a matrix,
-	and many intermediate results that can be used to recalculated the weight after
-	having modified a quantum number
-*/
-
-struct amatrix_weight_t
-{
-	/*
-		The actual weight.
-	*/
-
-	double weight;
-
-	/*
-		This information can be used to reconstruct the weight, given the labels.
-	*/
-
-	int l,h;
-
-	int nr_denominators;
-	struct
-	{
-		int labels[MAX_LABELS];
-		int qtypes[MAX_LABELS];
-		int ilabels;
-	}
-	denominators[MAX_DENOMINATORS];
-
-	int nr_numerators;
-	struct
-	{
-		int labels[4];
-	}
-	numerators[MAX_NUMERATORS];
-
-	double inversefactor,unphysical_penalty;
-
-	struct label_t labels[MAX_LABELS];
-	int ilabels;
-
-	/*
-		The excitation level of the diagram: 2 for doubles, 3 for triples, etc...
-	*/
-
-	int excitation_level;
-};
+#include "weight.h"
 
 /*
 	The 'amatrix' struct: a matrix following a certain set of rules,

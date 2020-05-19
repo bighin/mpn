@@ -7,7 +7,7 @@
 #include "cache.h"
 
 /*
-	I follow the algorithmic determination of multiplicity by Quoc
+	I follow the algorithmic determination of multiplicity by Quoc, see the notes.
 */
 
 bool create_one_by_swapping_cols(gsl_matrix_int *adjacency, size_t indexi, size_t indexj)

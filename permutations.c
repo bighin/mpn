@@ -1,6 +1,6 @@
+#include <assert.h>
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_rng.h>
-#include <assert.h>
 
 #include "permutations.h"
 #include "plist.h"

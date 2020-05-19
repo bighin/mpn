@@ -23,8 +23,8 @@ bool amatrix_cache_is_enabled=true;
 	representative of the arrangement of the zero/non-zero entries.
 
 	Note that there's nothing about the quantum numbers, since it would be
-	too expensive to cache that information. Because of this we cannot cache the weight,
-	that depends on the quantum numbers.
+	too expensive to cache that information. Because of this we cannot directly
+	cache the weight, that depends on the quantum numbers.
 */
 
 int amatrix_to_index(struct amatrix_t *amx)
@@ -154,6 +154,11 @@ void fill_cache(int dimensions,int expected_connected,int expected_not_connected
 
 bool init_cache(int max_dimensions)
 {
+	/*
+		In this file we assume many times that the maximum dimension is 6.
+		In case we want to go to higher orders, one needs to slightly revamp those bits.
+	*/
+
 	assert((max_dimensions>1)&&(max_dimensions<=6));
 	int total_alloced=0;
 
@@ -189,6 +194,8 @@ bool init_cache(int max_dimensions)
 	if(max_dimensions>=4) fill_cache(4,426,150);
 	if(max_dimensions>=5) fill_cache(5,11064,3336);
 	if(max_dimensions>=6) fill_cache(6,413640,104760);
+
+	return true;
 }
 
 void free_cache(void)

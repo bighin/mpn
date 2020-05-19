@@ -65,10 +65,12 @@ void pmatrix_set_entry(struct pmatrix_t *pmx, int i, int j, int value)
 	assert(pmx->values[i][j]>=0);
 	assert(value>=0);
 
+#if 0
 	if(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL)
 		assert(value<=pmx->nr_virtual);
 	else if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
 		assert(value<=pmx->nr_occupied);
+#endif
 
 	pmx->values[i][j]=value;
 }

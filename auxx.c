@@ -182,7 +182,7 @@ bool columns_are_identical(gsl_matrix_int *m, size_t col1, size_t col2)
 }
 
 /*
-	Positive and negative part of an integer and a double number
+	Positive and negative part of an integer and a double
 */
 
 int positive_part(int x)
@@ -384,6 +384,10 @@ char *find_and_replace(const char *src,const char *from,const char *to)
 	return value;
 }
 
+/*
+	Various function to handle discrete probability distributions
+*/
+
 void normalize_distribution(double *dists, int nrstates)
 {
 	double total=0.0f;
@@ -427,6 +431,11 @@ int cdist_search(const double *cdists, int lo, int hi, double selector)
 	assert(false);
 	return 0;
 }
+
+/*
+	cdist_linear_search() is provided here just as a reference, its result
+	must always coincide with cdist_search()
+*/
 
 int cdist_linear_search(const double *cdists, int lo, int hi, double selector)
 {

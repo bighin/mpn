@@ -20,6 +20,7 @@ void matrix_to_permutation(gsl_matrix_int *m,int *permutation);
 void pmatrix_to_permutation(struct pmatrix_t *m,int *permutation);
 
 bool init_cache(int max_dimensions);
+void free_cache(void);
 
 uint8_t cache_get_entry(int index, int dimensions);
 void cache_set_entry(int index, int dimensions, int multiplicity, bool isconnected);

@@ -11,8 +11,6 @@
 #include "auxx.h"
 #include "loaderis.h"
 #include "multiplicity.h"
-#include "cache.h"
-#include "permutations.h"
 
 /*
 	For this function and the next one, see Szabo-Ostlund, page 360.
@@ -99,80 +97,6 @@ void add_numerator(struct amatrix_weight_t *awt,int l1,int l2,int l3,int l4)
 void add_unphysical_penalty(struct amatrix_weight_t *awt,double penalty)
 {
 	awt->unphysical_penalty*=penalty;
-}
-
-double reconstruct_single_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
-{
-	/*
-		Keep in mind that here we do not check for connectedness.
-	*/
-
-	double denominators=1.0f;
-
-	for(int c=0;c<awt->nr_denominators;c++)
-	{
-		double denominator=0.0f;
-
-		for(int d=0;d<awt->denominators[c].ilabels;d++)
-		{
-			int label=awt->denominators[c].labels[d];
-
-			switch(awt->denominators[c].qtypes[d])
-			{
-				case QTYPE_OCCUPIED:
-				denominator+=get_occupied_energy(amx->ectx, awt->labels[label].value-1);
-				break;
-
-				case QTYPE_VIRTUAL:
-				denominator-=get_virtual_energy(amx->ectx, awt->labels[label].value-1);
-				break;
-			}
-		}
-
-		denominators*=denominator;
-	}
-
-	double numerators=1.0f;
-
-	for(int c=0;c<awt->nr_numerators;c++)
-	{
-		int l1,l2,l3,l4;
-
-		l1=awt->numerators[c].labels[0];
-		l2=awt->numerators[c].labels[1];
-		l3=awt->numerators[c].labels[2];
-		l4=awt->numerators[c].labels[3];
-
-		int i1,i2,i3,i4;
-
-		i1=awt->labels[l1].value-1+((awt->labels[l1].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
-		i2=awt->labels[l2].value-1+((awt->labels[l2].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
-		i3=awt->labels[l3].value-1+((awt->labels[l3].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
-		i4=awt->labels[l4].value-1+((awt->labels[l4].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
-
-		numerators*=get_eri(amx->ectx, i1, i2, i3, i4);
-	}
-
-	numerators*=awt->unphysical_penalty;
-
-	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
-
-#warning Cleanup or modify this
-
-	/*
-		Lindelöf resummation should happen here, as
-
-		return weight*exp(amx->config->epsilon*(charge)*log(charge))
-
-		for an appropriate Lindelöf charge.
-	*/
-
-	return weight;
-}
-
-double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_t *awt)
-{
-	return reconstruct_single_weight(amx,awt);
 }
 
 /*
@@ -432,18 +356,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	ret.h=h;
 	ret.inversefactor=inversefactor;
 
-	/*
-		At the very end, the ret structure contains all the informations needed to calculate
-		the weight, and the weight itself is given by pow(inversefactor,-1.0f)*numerators/denominators
-
-		Rather than just using this value, we invoke reconstruct_weight() since one might want
-		to associate group diagrams in pairs according to symmetries, and reconstruct_weight()
-		is the most natural place of doing so quite transparently.
-
-		Note that once the ret structure is filled, call to reconstruct_weight() is quite cheap.
-	*/
-
-	ret.weight=reconstruct_single_weight(amx,&ret);
+	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
 
 	return ret;
 }
@@ -665,4 +578,14 @@ gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_
 #endif
 
 	return incidence;
+}
+
+int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int pmatrix)
+{
+	for(int c=0;c<ilabels;c++)
+		if((labels[c].i==i)&&(labels[c].j==j)&&(labels[c].pmatrix==pmatrix))
+			return c;
+
+	assert(false);
+	return 0;
 }

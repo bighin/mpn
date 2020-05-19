@@ -1,17 +1,13 @@
 #include <stdio.h>
-#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 
-#include <gsl/gsl_math.h>
 #include <gsl/gsl_matrix_int.h>
 
 #include "amatrix.h"
 #include "pmatrix.h"
 #include "loaderis.h"
-#include "mpn.h"
-#include "multiplicity.h"
 #include "cache.h"
 #include "auxx.h"
 
@@ -375,87 +371,4 @@ bool amatrix_check_connectedness(struct amatrix_t *amx)
 	}
 
 	return actual_amatrix_check_connectedness(amx);
-}
-
-/*
-	Here we calculate the weight associated to a 'amatrix'
-*/
-
-struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx)
-{
-	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
-	assert(amx->pmxs[0]->dimensions>=1);
-
-	if(amx->cached_weight_is_valid==true)
-	{
-
-#ifndef NDEBUG
-		amx->cached_weight_is_valid=false;
-
-		double w1,w2;
-
-		w1=amx->cached_weight.weight;
-		w2=amatrix_weight(amx).weight;
-		assert(gsl_fcmp(w1,w2,1e-6)==0);
-
-		amx->cached_weight_is_valid=true;
-#endif
-
-		return amx->cached_weight;
-	}
-
-	if(amatrix_check_connectedness(amx)==false)
-	{
-		struct amatrix_weight_t ret={0.0,0,0};
-		return ret;
-	}
-
-	/*
-		Dimension 1 is a special case that does not need the evaluation
-		of the incidence matrix.
-
-		Note that dimension 1 (a bit unexpectedly) corresponds to the Hartree-Fock energy.
-	*/
-
-	if(amx->pmxs[0]->dimensions==1)
-	{
-		int a,b;
-		double weight=0.0f,multiplicity;
-
-		a=pmatrix_get_entry(amx->pmxs[0],0,0);
-		b=pmatrix_get_entry(amx->pmxs[1],0,0);
-
-		if(a==b)
-			weight+=get_hdiag(amx->ectx,a-1);
-
-		weight+=0.5*get_eri(amx->ectx,a-1,b-1,a-1,b-1);
-		weight+=get_enuc(amx->ectx)*pow(amx->nr_occupied,-2.0f);
-
-		multiplicity=1.0f;
-
-		amx->cached_weight.weight=weight/multiplicity;
-		amx->cached_weight.l=0;
-		amx->cached_weight.h=2;
-		amx->cached_weight_is_valid=true;
-
-		return amx->cached_weight;
-	}
-	else
-	{
-		struct amatrix_weight_t ret;
-
-		gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, ret.labels, &ret.ilabels);
-		ret=incidence_to_weight(incidence, ret.labels, &ret.ilabels, amx);
-		gsl_matrix_int_free(incidence);
-
-		amx->cached_weight=ret;
-		amx->cached_weight_is_valid=true;
-
-		return ret;
-	}
-
-	assert(false);
-
-	struct amatrix_weight_t ret={0.0,0,0};
-	return ret;
 }

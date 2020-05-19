@@ -30,16 +30,6 @@ extern "C" {
 	The updates
 */
 
-int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int pmatrix)
-{
-	for(int c=0;c<ilabels;c++)
-		if((labels[c].i==i)&&(labels[c].j==j)&&(labels[c].pmatrix==pmatrix))
-			return c;
-
-	assert(false);
-	return 0;
-}
-
 double extend_pdf(struct amatrix_t *amx,struct amatrix_weight_t *awt)
 {
 	double weight=reconstruct_weight(amx, awt);

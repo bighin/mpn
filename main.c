@@ -1,15 +1,12 @@
 #include <stdio.h>
 #include <stdbool.h>
-#include <math.h>
-#include <assert.h>
 
 #include <gsl/gsl_rng.h>
 
-#include "amatrix.h"
-#include "mc.h"
 #include "config.h"
 #include "cache.h"
-#include "auxx.h"
+#include "mc.h"
+
 
 void usage(char *argv0)
 {
@@ -48,4 +45,6 @@ int main(int argc,char *argv[])
 		if((c+1)!=argc)
 			printf("\n");
 	}
+
+	free_cache();
 }
