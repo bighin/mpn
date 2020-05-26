@@ -11,6 +11,7 @@
 struct amatrix_collection_t
 {
 	struct amatrix_t **amatrices;
+	bool *mustfree;
 	int iamatrices,nralloced;
 };
 
@@ -32,6 +33,10 @@ void fini_collection(struct amatrix_collection_t *acl)
 {
 	if(acl)
 	{
+		for(int c=0;c<acl->iamatrices;c++)
+			if(acl->mustfree[c]==true)
+				fini_amatrix(acl->amatrices[c],false);
+
 		if(acl->amatrices)
 			free(acl->amatrices);
 
@@ -39,7 +44,7 @@ void fini_collection(struct amatrix_collection_t *acl)
 	}
 }
 
-void collection_add(struct amatrix_collection_t *acl,struct amatrix_t *amx)
+void collection_add(struct amatrix_collection_t *acl,struct amatrix_t *amx,bool mustfree)
 {
 	if(acl->iamatrices>=acl->nralloced)
 	{
@@ -47,9 +52,11 @@ void collection_add(struct amatrix_collection_t *acl,struct amatrix_t *amx)
 
 		acl->nralloced+=16;
 		acl->amatrices=realloc(acl->amatrices,sizeof(struct amatrix_t *)*acl->nralloced);
+		acl->mustfree=realloc(acl->mustfree,sizeof(bool)*acl->nralloced);
 	}
 
 	acl->amatrices[acl->iamatrices]=amx;
+	acl->mustfree[acl->iamatrices]=mustfree;
 	acl->iamatrices++;
 }
 
@@ -114,7 +121,7 @@ void cdet_generate_grouping(struct amatrix_t *amx, struct amatrix_collection_t *
 		The original adjacency matrix
 	*/
 
-	collection_add(acl,amx);
+	collection_add(acl,amx,false);
 
 	/*
 		The transposed adjacency matrix
@@ -136,7 +143,7 @@ void cdet_generate_grouping(struct amatrix_t *amx, struct amatrix_collection_t *
 		}
 	}
 
-	collection_add(acl,twin);
+	collection_add(acl,twin,true);
 
 	/*
 		The anti-transposed adjacency matrix
@@ -160,7 +167,7 @@ void cdet_generate_grouping(struct amatrix_t *amx, struct amatrix_collection_t *
 		}
 	}
 
-	collection_add(acl,twin);
+	collection_add(acl,twin,true);
 
 	/*
 		Finally we apply both operations at once
@@ -184,7 +191,7 @@ void cdet_generate_grouping(struct amatrix_t *amx, struct amatrix_collection_t *
 		}
 	}
 
-	collection_add(acl,twin);
+	collection_add(acl,twin,true);
 }
 
 void cdet_generate_grouping_alt(struct amatrix_t *amx, struct amatrix_collection_t *acl)
@@ -205,7 +212,7 @@ void cdet_generate_grouping_alt(struct amatrix_t *amx, struct amatrix_collection
 		The original adjacency matrix
 	*/
 
-	collection_add(acl,amx);
+	collection_add(acl,amx,false);
 
 	/*
 		The transposed adjacency matrix
@@ -229,7 +236,7 @@ void cdet_generate_grouping_alt(struct amatrix_t *amx, struct amatrix_collection
 			}
 		}
 
-		collection_add(acl, twin);
+		collection_add(acl, twin,true);
 	}
 
 	/*
@@ -256,7 +263,7 @@ void cdet_generate_grouping_alt(struct amatrix_t *amx, struct amatrix_collection
 			}
 		}
 
-		collection_add(acl, twin);
+		collection_add(acl, twin, true);
 	}
 
 	/*
@@ -283,7 +290,7 @@ void cdet_generate_grouping_alt(struct amatrix_t *amx, struct amatrix_collection
 			}
 		}
 
-		collection_add(acl, twin);
+		collection_add(acl, twin, true);
 	}
 }
 
@@ -398,6 +405,7 @@ double amatrix_weight(struct amatrix_t *amx)
 
 		double ret,combinatorial,Rdenominator;
 		int nr_weights;
+
 		cdet_generate_grouping_alt(amx, acl);
 
 		//printf("[%d] ",amx->pmxs[0]->dimensions);
@@ -435,9 +443,6 @@ double amatrix_weight(struct amatrix_t *amx)
 		}
 
 		//printf("\n");
-
-		for(int c=1;c<acl->iamatrices;c++)
-			fini_amatrix(acl->amatrices[c],false);
 
 		fini_collection(acl);
 
