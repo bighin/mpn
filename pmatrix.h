@@ -22,14 +22,16 @@ void fini_pmatrix(struct pmatrix_t *pmx);
 int pmatrix_get_entry(struct pmatrix_t *pmx, int i, int j);
 void pmatrix_set_entry(struct pmatrix_t *pmx, int i, int j, int value);
 
+int pmatrix_get_raw_entry(struct pmatrix_t *pmx, int i, int j);
+void pmatrix_set_raw_entry(struct pmatrix_t *pmx, int i, int j, int value);
+
 void pmatrix_print(struct pmatrix_t *pmx);
 
+void pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj);
+void pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx);
 
-double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj);
-double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx);
-
-void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx);
-void pmatrix_swap_cols(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx);
+void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, gsl_rng *rngctx);
+void pmatrix_swap_cols(struct pmatrix_t *pmx, int i1, int i2, gsl_rng *rngctx);
 
 bool pmatrix_check_consistency(struct pmatrix_t *pmx);
 

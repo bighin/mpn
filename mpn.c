@@ -76,34 +76,11 @@ int count_loops(struct label_t *labels, int *ilabels, int mels[MAX_MATRIX_ELEMEN
 	return loops;
 }
 
-void add_denominator_entry(struct amatrix_weight_t *awt, int label, int qtype)
-{
-	int index=awt->denominators[awt->nr_denominators].ilabels;
-
-	awt->denominators[awt->nr_denominators].labels[index]=label;
-	awt->denominators[awt->nr_denominators].qtypes[index]=qtype;
-	awt->denominators[awt->nr_denominators].ilabels++;
-}
-
-void add_numerator(struct amatrix_weight_t *awt,int l1,int l2,int l3,int l4)
-{
-	awt->numerators[awt->nr_numerators].labels[0]=l1;
-	awt->numerators[awt->nr_numerators].labels[1]=l2;
-	awt->numerators[awt->nr_numerators].labels[2]=l3;
-	awt->numerators[awt->nr_numerators].labels[3]=l4;
-	awt->nr_numerators++;
-}
-
-void add_unphysical_penalty(struct amatrix_weight_t *awt,double penalty)
-{
-	awt->unphysical_penalty*=penalty;
-}
-
 /*
 	This function calculates a diagram's weight given the incidence matrix
 */
 
-struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx)
+double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx)
 {
 	bool verbose=false;
 
@@ -183,22 +160,10 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 	}
 
 	/*
-		This structure will contain the final calculated weight, along with plenty of
-		additional information, allowing one to reconstruct the weight from scratch.
-	*/
-
-	struct amatrix_weight_t ret;
-
-	ret.nr_denominators=0;
-	ret.nr_numerators=0;
-	ret.unphysical_penalty=1.0f;
-
-	/*
 		Rule 4: denominators
 	*/
 
 	double denominators=1.0f;
-	int excitation_level=0;
 
 	for(size_t i=0;i<(B->size1-1);i++)
 	{
@@ -207,8 +172,6 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 
 		double denominator=0.0f;
 		int energies_in_denominator=0;
-
-		ret.denominators[ret.nr_denominators].ilabels=0;
 
 		for(size_t j=0;j<B->size2;j++)
 		{
@@ -225,8 +188,6 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 
 				if(verbose==true)
 					printf("%c",labels[j].mnemonic);
-
-				add_denominator_entry(&ret, j, labels[j].qtype);
 
 				switch(labels[j].qtype)
 				{
@@ -247,25 +208,11 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		}
 
 		if(energies_in_denominator>0)
-		{
 			denominators*=denominator;
-			ret.nr_denominators++;
-
-			/*
-				The excitation level of the diagram corresponds to the
-				larger number of energies in a denominator, divided by two.
-			*/
-
-#warning This might be wrong!
-
-			excitation_level=MAX(excitation_level,energies_in_denominator/2);
-		}
 
 		if(verbose==true)
 			printf("}\n");
 	}
-
-	ret.excitation_level=excitation_level;
 
 	/*
 		Additional rule: phase factor
@@ -312,8 +259,6 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 			*/
 
 			numerators*=amx->config->unphysicalpenalty;
-			add_unphysical_penalty(&ret,amx->config->unphysicalpenalty);
-
 			continue;
 		}
 
@@ -337,8 +282,6 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		i4=labels[mels[i][3]].value-1+((labels[mels[i][3]].qtype==QTYPE_VIRTUAL)?(amx->ectx->nocc):(0));
 
 		numerators*=get_eri(amx->ectx, i1, i2, i3, i4);
-
-		add_numerator(&ret,mels[i][0],mels[i][1],mels[i][2],mels[i][3]);
 	}
 
 	if(verbose==true)
@@ -349,16 +292,7 @@ struct amatrix_weight_t incidence_to_weight(gsl_matrix_int *B, struct label_t *l
 		we return it.
 	*/
 
-	memcpy(ret.labels,labels,sizeof(struct label_t)*MAX_LABELS);
-	ret.ilabels=*ilabels;
-
-	ret.l=l;
-	ret.h=h;
-	ret.inversefactor=inversefactor;
-
-	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
-
-	return ret;
+	return pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
 }
 
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels)
@@ -578,14 +512,4 @@ gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_
 #endif
 
 	return incidence;
-}
-
-int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int pmatrix)
-{
-	for(int c=0;c<ilabels;c++)
-		if((labels[c].i==i)&&(labels[c].j==j)&&(labels[c].pmatrix==pmatrix))
-			return c;
-
-	assert(false);
-	return 0;
 }

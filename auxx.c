@@ -62,7 +62,7 @@ int ipow(int base,int exp)
 {
 	int result=1;
 
-	for (;;)
+	for(;;)
 	{
 		if (exp&1)
 			result *= base;

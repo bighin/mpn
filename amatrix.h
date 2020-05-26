@@ -7,7 +7,6 @@
 #include "pmatrix.h"
 #include "config.h"
 #include "limits.h"
-#include "weight.h"
 
 /*
 	The 'amatrix' struct: a matrix following a certain set of rules,
@@ -47,23 +46,21 @@ struct amatrix_t
 		The cached weight
 	*/
 
-	struct amatrix_weight_t cached_weight;
+	double cached_weight;
 	bool cached_weight_is_valid;
 };
 
 struct amatrix_t *init_amatrix(struct configuration_t *config);
-void fini_amatrix(struct amatrix_t *amx);
+void fini_amatrix(struct amatrix_t *amx,bool free_ectx);
 
 int amatrix_get_entry(struct amatrix_t *amx, int i, int j);
-
-void amatrix_print(struct amatrix_t *amx);
 
 struct amatrix_backup_t
 {
 	int dimensions[2];
 	int values[2][PMATRIX_MAX_DIMENSIONS][PMATRIX_MAX_DIMENSIONS];
 
-	struct amatrix_weight_t cached_result;
+	double cached_result;
 	bool cached_result_is_valid;
 };
 
@@ -73,11 +70,11 @@ void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup);
 bool amatrix_check_consistency(struct amatrix_t *amx);
 bool amatrix_is_physical(struct amatrix_t *amx);
 
+void amatrix_print(struct amatrix_t *amx);
 void amatrix_to_python(struct amatrix_t *amx);
 void amatrix_to_wolfram(struct amatrix_t *amx);
 
 bool actual_amatrix_check_connectedness(struct amatrix_t *amx);
 bool amatrix_check_connectedness(struct amatrix_t *amx);
-struct amatrix_weight_t amatrix_weight(struct amatrix_t *amx);
 
 #endif //__AMATRIX_H__

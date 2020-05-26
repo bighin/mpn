@@ -147,7 +147,7 @@ void fill_cache(int dimensions,int expected_connected,int expected_not_connected
 		}
 	}
 
-	fini_amatrix(amx);
+	fini_amatrix(amx,true);
 
 	assert((connected==expected_connected)&&(not_connected==expected_not_connected));
 }

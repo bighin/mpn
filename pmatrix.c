@@ -6,7 +6,6 @@
 
 #include "pmatrix.h"
 #include "mpn.h"
-#include "auxx.h"
 
 struct pmatrix_t *init_pmatrix(int nr_occupied,int nr_virtual,gsl_rng *rngctx)
 {
@@ -65,12 +64,10 @@ void pmatrix_set_entry(struct pmatrix_t *pmx, int i, int j, int value)
 	assert(pmx->values[i][j]>=0);
 	assert(value>=0);
 
-#if 0
-	if(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL)
-		assert(value<=pmx->nr_virtual);
-	else if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
+	if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
 		assert(value<=pmx->nr_occupied);
-#endif
+	else if(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL)
+		assert(value<=pmx->nr_virtual);
 
 	pmx->values[i][j]=value;
 }
@@ -109,7 +106,7 @@ void pmatrix_print(struct pmatrix_t *pmx)
 	fflush(stdout);
 }
 
-double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj)
+void pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int *targetj)
 {
 	int selector=gsl_rng_uniform_int(rngctx, pmx->dimensions+1);
 
@@ -179,7 +176,7 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int 
 
 		if(pmatrix_entry_type(i,pmx->dimensions-1)==pmatrix_entry_type(i,j))
 		{
-			pmatrix_set_entry(pmx, i, pmx->dimensions-1, pmatrix_get_entry(pmx, i, j));
+			pmatrix_set_raw_entry(pmx, i, pmx->dimensions-1, pmatrix_get_raw_entry(pmx, i, j));
 		}
 		else
 		{
@@ -190,7 +187,7 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int 
 
 		if(pmatrix_entry_type(pmx->dimensions-1, j)==pmatrix_entry_type(i,j))
 		{
-			pmatrix_set_entry(pmx, pmx->dimensions-1, j, pmatrix_get_entry(pmx, i, j));
+			pmatrix_set_raw_entry(pmx, pmx->dimensions-1, j, pmatrix_get_raw_entry(pmx, i, j));
 		}
 		else
 		{
@@ -204,7 +201,7 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int 
 
 		pmatrix_set_entry(pmx, i, j, 0);
 
-		return pmx->dimensions;
+		return;
 	}
 	else if(selector==pmx->dimensions)
 	{
@@ -236,14 +233,13 @@ double pmatrix_extend(struct pmatrix_t *pmx, gsl_rng *rngctx, int *targeti, int 
 
 		pmatrix_set_entry(pmx, pmx->dimensions-1, pmx->dimensions-1, 1);
 
-		return pmx->dimensions;
+		return;
 	}
 
 	assert(false);
-	return 0.0f;
 }
 
-double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx)
+void pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx)
 {
 	assert(pmx->dimensions>1);
 
@@ -296,7 +292,7 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx)
 
 		pmx->dimensions--;
 
-		return 1.0f/(pmx->dimensions+1);
+		return;
 	}
 
 	/*
@@ -322,125 +318,15 @@ double pmatrix_squeeze(struct pmatrix_t *pmx, gsl_rng *rngctx)
 	pmatrix_set_raw_entry(pmx, i, j, newvalue);
 
 	pmx->dimensions--;
-
-	return 1.0f/(pmx->dimensions+1);
 }
 
-void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int reverse[2], gsl_rng *rngctx)
+void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, gsl_rng *rngctx)
 {
 	assert(i1>=0);
 	assert(i1<pmx->dimensions);
 	assert(i2>=0);
 	assert(i2<pmx->dimensions);
 	assert(pmatrix_check_consistency(pmx)==true);
-
-	update[QTYPE_OCCUPIED]=update[QTYPE_VIRTUAL]=reverse[QTYPE_OCCUPIED]=reverse[QTYPE_VIRTUAL]=0;
-
-#ifndef NDEBUG
-	int x1=0,x2=0;
-#endif
-
-	/*
-		How many occupied and virtual entries are there in the i1-th row?
-		How will things change when this becomes the i2-th row?
-	*/
-
-	int oldvirtual,oldoccupied,newvirtual,newoccupied;
-
-	oldvirtual=oldoccupied=newvirtual=newoccupied=0;
-	for(int j=0;j<pmx->dimensions;j++)
-	{
-		if(pmatrix_get_entry(pmx, i1, j)!=0)
-		{
-			if(pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)
-				oldoccupied++;
-			else
-				oldvirtual++;
-
-			if(pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)
-				newoccupied++;
-			else
-				newvirtual++;
-
-			/*
-				Going from occupied to virtual
-			*/
-
-			if((pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL))
-				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value(pmx, rngctx, i2, j));
-
-			/*
-				Going from virtual to occupied
-			*/
-
-			if((pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED))
-				pmatrix_set_entry(pmx, i1, j, pmatrix_get_new_value(pmx, rngctx, i2, j));
-
-#ifndef NDEBUG
-			if((pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL)) x2++;
-			if((pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)) x1++;
-#endif
-		}
-	}
-
-	update[QTYPE_OCCUPIED]+=positive_part(newoccupied-oldoccupied);
-	update[QTYPE_VIRTUAL]+=positive_part(newvirtual-oldvirtual);
-	reverse[QTYPE_OCCUPIED]+=negative_part(newoccupied-oldoccupied);
-	reverse[QTYPE_VIRTUAL]+=negative_part(newvirtual-oldvirtual);
-
-	/*
-		Same for the i2-th row.
-	*/
-
-	oldvirtual=oldoccupied=newvirtual=newoccupied=0;
-	for(int j=0;j<pmx->dimensions;j++)
-	{
-		if(pmatrix_get_entry(pmx, i2, j)!=0)
-		{
-			if(pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)
-				oldoccupied++;
-			else
-				oldvirtual++;
-
-			if(pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)
-				newoccupied++;
-			else
-				newvirtual++;
-
-			/*
-				Going from occupied to virtual
-			*/
-
-			if((pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL))
-				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value(pmx, rngctx, i1, j));
-
-			/*
-				Going from virtual to occupied
-			*/
-
-			if((pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED))
-				pmatrix_set_entry(pmx, i2, j, pmatrix_get_new_value(pmx, rngctx, i1, j));
-
-#ifndef NDEBUG
-			if((pmatrix_entry_type(i2,j)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i1,j)==QTYPE_VIRTUAL)) x2++;
-			if((pmatrix_entry_type(i2,j)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i1,j)==QTYPE_OCCUPIED)) x1++;
-#endif
-		}
-	}
-
-	update[QTYPE_OCCUPIED]+=positive_part(newoccupied-oldoccupied);
-	update[QTYPE_VIRTUAL]+=positive_part(newvirtual-oldvirtual);
-	reverse[QTYPE_OCCUPIED]+=negative_part(newoccupied-oldoccupied);
-	reverse[QTYPE_VIRTUAL]+=negative_part(newvirtual-oldvirtual);
-
-#ifndef NDEBUG
-	assert(update[QTYPE_OCCUPIED]==x1);
-	assert(update[QTYPE_VIRTUAL]==x2);
-#endif
-
-	/*
-		Finally we actually swap the rows!
-	*/
 
 	for(int j=0;j<pmx->dimensions;j++)
 	{
@@ -453,116 +339,13 @@ void pmatrix_swap_rows(struct pmatrix_t *pmx, int i1, int i2, int update[2], int
 	assert(pmatrix_check_consistency(pmx)==true);
 }
 
-void pmatrix_swap_cols(struct pmatrix_t *pmx, int j1, int j2, int update[2], int reverse[2], gsl_rng *rngctx)
+void pmatrix_swap_cols(struct pmatrix_t *pmx, int j1, int j2, gsl_rng *rngctx)
 {
 	assert(j1>=0);
 	assert(j1<pmx->dimensions);
 	assert(j2>=0);
 	assert(j2<pmx->dimensions);
 	assert(pmatrix_check_consistency(pmx)==true);
-
-#ifndef NDEBUG
-	int x1=0,x2=0;
-#endif
-
-	update[QTYPE_OCCUPIED]=update[QTYPE_VIRTUAL]=reverse[QTYPE_OCCUPIED]=reverse[QTYPE_VIRTUAL]=0;
-
-	/*
-		How many occupied and virtual entries are there in the i1-th row?
-		How will things change when this becomes the i2-th row?
-	*/
-
-	int oldvirtual,oldoccupied,newvirtual,newoccupied;
-
-	oldvirtual=oldoccupied=newvirtual=newoccupied=0;
-	for(int i=0;i<pmx->dimensions;i++)
-	{
-		if(pmatrix_get_entry(pmx, i, j1)!=0)
-		{
-			if(pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)
-				oldoccupied++;
-			else
-				oldvirtual++;
-
-			if(pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)
-				newoccupied++;
-			else
-				newvirtual++;
-
-			/*
-				Going from occupied to virtual
-			*/
-
-			if((pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL))
-				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value(pmx, rngctx, i, j2));
-
-			/*
-				Going from virtual to occupied
-			*/
-
-			if((pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED))
-				pmatrix_set_entry(pmx, i, j1, pmatrix_get_new_value(pmx, rngctx, i, j2));
-
-#ifndef NDEBUG
-			if((pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL)) x2++;
-			if((pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)) x1++;
-#endif
-		}
-	}
-
-	update[QTYPE_OCCUPIED]+=positive_part(newoccupied-oldoccupied);
-	update[QTYPE_VIRTUAL]+=positive_part(newvirtual-oldvirtual);
-	reverse[QTYPE_OCCUPIED]+=negative_part(newoccupied-oldoccupied);
-	reverse[QTYPE_VIRTUAL]+=negative_part(newvirtual-oldvirtual);
-
-	oldvirtual=oldoccupied=newvirtual=newoccupied=0;
-	for(int i=0;i<pmx->dimensions;i++)
-	{
-		if(pmatrix_get_entry(pmx, i, j2)!=0)
-		{
-			if(pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)
-				oldoccupied++;
-			else
-				oldvirtual++;
-
-			if(pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)
-				newoccupied++;
-			else
-				newvirtual++;
-
-			/*
-				Going from occupied to virtual
-			*/
-
-			if((pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL))
-				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value(pmx, rngctx, i, j1));
-
-			/*
-				Going from virtual to occupied
-			*/
-
-			if((pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED))
-				pmatrix_set_entry(pmx, i, j2, pmatrix_get_new_value(pmx, rngctx, i, j1));
-
-#ifndef NDEBUG
-			if((pmatrix_entry_type(i,j2)==QTYPE_OCCUPIED)&&(pmatrix_entry_type(i,j1)==QTYPE_VIRTUAL)) x2++;
-			if((pmatrix_entry_type(i,j2)==QTYPE_VIRTUAL)&&(pmatrix_entry_type(i,j1)==QTYPE_OCCUPIED)) x1++;
-#endif
-		}
-	}
-
-	update[QTYPE_OCCUPIED]+=positive_part(newoccupied-oldoccupied);
-	update[QTYPE_VIRTUAL]+=positive_part(newvirtual-oldvirtual);
-	reverse[QTYPE_OCCUPIED]+=negative_part(newoccupied-oldoccupied);
-	reverse[QTYPE_VIRTUAL]+=negative_part(newvirtual-oldvirtual);
-
-#ifndef NDEBUG
-	assert(update[QTYPE_OCCUPIED]==x1);
-	assert(update[QTYPE_VIRTUAL]==x2);
-#endif
-	/*
-		Finally we actually swap the columns!
-	*/
 
 	for(int i=0;i<pmx->dimensions;i++)
 	{

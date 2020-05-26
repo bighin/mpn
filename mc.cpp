@@ -23,6 +23,7 @@ extern "C" {
 #include "mpn.h"
 #include "config.h"
 #include "permutations.h"
+#include "weight.h"
 
 #include "libprogressbar/progressbar.h"
 
@@ -30,43 +31,10 @@ extern "C" {
 	The updates
 */
 
-double extend_pdf(struct amatrix_t *amx,struct amatrix_weight_t *awt)
-{
-	double weight=reconstruct_weight(amx, awt);
-
-	return fabs(weight);
-}
-
-void pmatrix_set_entry_with_distribution(struct pmatrix_t *pmx, int i, int j, int value, gsl_rng *rngctx)
-{
-	if(pmatrix_entry_type(i,j)==QTYPE_VIRTUAL)
-	{
-		int actualvalue=value+pmx->nr_virtual*gsl_rng_uniform_int(rngctx, pmx->nr_occupied);
-
-		pmatrix_set_entry(pmx,i,j,actualvalue);
-
-		assert(pmatrix_get_entry(pmx,i,j)==value);
-		assert((actualvalue>=1)&&(actualvalue<=(pmx->nr_virtual*pmx->nr_occupied)));
-		return;
-	}
-	else if(pmatrix_entry_type(i,j)==QTYPE_OCCUPIED)
-	{
-		int actualvalue=value+pmx->nr_occupied*gsl_rng_uniform_int(rngctx, pmx->nr_virtual);
-
-		pmatrix_set_entry(pmx,i,j,actualvalue);
-
-		assert(pmatrix_get_entry(pmx,i,j)==value);
-		assert((actualvalue>=1)&&(actualvalue<=(pmx->nr_virtual*pmx->nr_occupied)));
-		return;
-	}
-
-	assert(false);
-}
-
 int update_extend(struct amatrix_t *amx, bool always_accept)
 {
-	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
-	double probability=1.0f;
+	double weightratio=1.0f/fabs(amatrix_weight(amx));
+	double extend_probability,squeeze_probability;
 
 	if(amx->pmxs[0]->dimensions>=amx->config->maxorder)
 		return UPDATE_UNPHYSICAL;
@@ -74,105 +42,30 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	int i1,j1,i2,j2;
+	extend_probability=1.0f/pow(amx->pmxs[0]->dimensions+1, 2.0f)/pow(amx->nr_occupied*amx->nr_virtual,2.0f);
+	squeeze_probability=1.0f;
 
-	probability*=pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i1, &j1);
-	probability*=pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i2, &j2);
+	int i1, j1, i2, j2;
 
-	if(amatrix_check_connectedness(amx)==false)
-	{
-		amatrix_restore(amx, &backup);
-		return UPDATE_REJECTED;
-	}
+	pmatrix_extend(amx->pmxs[0], amx->rng_ctx, &i1, &j1);
+	pmatrix_extend(amx->pmxs[1], amx->rng_ctx, &i2, &j2);
+
+	pmatrix_set_raw_entry(amx->pmxs[0],i1,j1,pmatrix_get_new_value(amx->pmxs[0],amx->rng_ctx,i1,j1));
+	pmatrix_set_raw_entry(amx->pmxs[1],i2,j2,pmatrix_get_new_value(amx->pmxs[1],amx->rng_ctx,i2,j2));
 
 	amx->cached_weight_is_valid=false;
-
-	struct amatrix_weight_t w=amatrix_weight(amx);
-
-	/*
-		Now we have to select the two missing values from a suitable distribution, that
-		depends, therefore, on two variables.
-
-		We map the (discrete) joint probability distribution function to a unidimensional
-		one, using p(index)=p(c,d) with:
-
-		index=c+d*nr_states1
-
-		the obvious inverses being:
-
-		c=index%nr_states1
-		d=index/nr_states1
-	*/
-
-	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
-	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
-
-	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1,0);
-	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2,1);
-
-	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
-	double *cdists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
-
-	for(int c=0;c<nr_states1;c++)
-	{
-		for(int d=0;d<nr_states2;d++)
-		{
-			int index=c+d*nr_states1;
-
-			assert(index==((index%nr_states1)+(index/nr_states1)*nr_states1));
-
-			w.labels[label1].value=1+c;
-			w.labels[label2].value=1+d;
-
-			dists[index]=extend_pdf(amx, &w);
-		}
-	}
-
-	normalize_distribution(dists,nr_states1*nr_states2);
-	to_cumulative_distribution(dists,cdists,nr_states1*nr_states2);
-
-	/*
-		Now that we have the probability distribution, we sample one random value from it.
-	*/
-
-	double selector=gsl_rng_uniform(amx->rng_ctx);
-
-	int c,d,index;
-
-	index=cdist_search(cdists, 0, nr_states1*nr_states2, selector);
-	c=index%nr_states1;
-	d=index/nr_states1;
-
-	assert(index==(c+d*nr_states1));
-	assert(cdist_search(cdists, 0, nr_states1*nr_states2, selector)==cdist_linear_search(cdists, 0, nr_states1*nr_states2, selector));
-
-	pmatrix_set_entry_with_distribution(amx->pmxs[0], i1, j1, 1+c, amx->rng_ctx);
-	pmatrix_set_entry_with_distribution(amx->pmxs[1], i2, j2, 1+d, amx->rng_ctx);
-	amx->cached_weight_is_valid=false;
-
-	w.labels[label1].value=1+c;
-	w.labels[label2].value=1+d;
-
-	probability*=1.0f/dists[index];
-
-	free(cdists);
-	free(dists);
 
 	/*
 		Finally we calculate the acceptance ratio for the update.
 	*/
 
 	double acceptance_ratio;
-	double currentweight=reconstruct_weight(amx, &w);
-
-	amx->cached_weight=w;
-	amx->cached_weight.weight=currentweight;
-	amx->cached_weight_is_valid=true;
+	double currentweight=amatrix_weight(amx);
 
 	weightratio*=fabs(currentweight);
-	acceptance_ratio=weightratio*probability;
+	acceptance_ratio=weightratio/extend_probability*squeeze_probability;
 
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio) ? (true) : (false);
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
@@ -183,69 +76,10 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
-void find_squeeze_target(struct pmatrix_t *pmx,int *iprime,int *jprime)
-{
-#ifndef NDEBUG
-	*iprime=*jprime=-1;
-#endif
-
-	int dimensions=pmx->dimensions;
-
-	for(int i=0;i<dimensions;i++)
-	{
-		if(pmatrix_get_entry(pmx,i,dimensions-1)!=0)
-		{
-			*iprime=i;
-			break;
-		}
-	}
-
-	for(int j=0;j<dimensions;j++)
-	{
-		if(pmatrix_get_entry(pmx,dimensions-1,j)!=0)
-		{
-			*jprime=j;
-			break;
-		}
-	}
-
-	assert((*iprime!=-1)&&(*jprime!=-1));
-
-	/*
-		If the Squeeze update will be targeting the corner entry in
-		the bottom-right corner, we can return straight away.
-	*/
-
-	if((*iprime==(dimensions-1))&&(*jprime==(dimensions-1)))
-		return;
-
-	/*
-		Otherwise the update will be targeting an entry either in the rightmost
-		column or in the bottom row. Let's find the coordinates and return.
-	*/
-
-	assert(pmatrix_entry_type(*iprime,dimensions-1)!=pmatrix_entry_type(dimensions-1,*jprime));
-
-	if(pmatrix_entry_type(*iprime,*jprime)!=pmatrix_entry_type(*iprime,dimensions-1))
-	{
-		*jprime=dimensions-1;
-		return;
-	}
-	else if(pmatrix_entry_type(*iprime,*jprime)!=pmatrix_entry_type(dimensions-1,*jprime))
-	{
-		*iprime=dimensions-1;
-		return;
-	}
-
-	assert(false);
-}
-
 int update_squeeze(struct amatrix_t *amx, bool always_accept)
 {
-	struct amatrix_weight_t w=amatrix_weight(amx);
-
-	double weightratio=1.0f/fabs(w.weight);
-	double probability=1.0f;
+	double weightratio=fabs(amatrix_weight(amx));
+	double extend_probability,squeeze_probability;
 
 	if(amx->pmxs[0]->dimensions<=amx->config->minorder)
 		return UPDATE_UNPHYSICAL;
@@ -253,52 +87,20 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	int i1,j1,i2,j2;
+	extend_probability=1.0f/pow(amx->pmxs[0]->dimensions, 2.0f)/pow(amx->nr_occupied*amx->nr_virtual,2.0f);
+	squeeze_probability=1.0f;
 
-	find_squeeze_target(amx->pmxs[0],&i1,&j1);
-	find_squeeze_target(amx->pmxs[1],&i2,&j2);
+	pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx);
+	pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx);
 
-	int label1=coordinate_to_label_index(w.labels,w.ilabels,i1,j1,0);
-	int label2=coordinate_to_label_index(w.labels,w.ilabels,i2,j2,1);
-
-	int value1=pmatrix_get_entry(amx->pmxs[0],i1,j1);
-	int value2=pmatrix_get_entry(amx->pmxs[1],i2,j2);
-
-	int nr_states1=(pmatrix_entry_type(i1,j1)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
-	int nr_states2=(pmatrix_entry_type(i2,j2)==QTYPE_VIRTUAL)?(amx->nr_virtual):(amx->nr_occupied);
-
-	double *dists=(double *)malloc(sizeof(double)*nr_states1*nr_states2);
-
-	for(int c=0;c<nr_states1;c++)
-	{
-		for(int d=0;d<nr_states2;d++)
-		{
-			int index=c+d*nr_states1;
-
-			w.labels[label1].value=1+c;
-			w.labels[label2].value=1+d;
-
-			dists[index]=extend_pdf(amx,&w);
-		}
-	}
-
-	normalize_distribution(dists,nr_states1*nr_states2);
-
-	int index=(value1-1)+(value2-1)*nr_states1;
-	probability*=dists[index];
-
-	free(dists);
-
-	probability*=pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx);
-	probability*=pmatrix_squeeze(amx->pmxs[1], amx->rng_ctx);
 	amx->cached_weight_is_valid=false;
 
 	double acceptance_ratio;
 
-	weightratio*=fabs(amatrix_weight(amx).weight);
-	acceptance_ratio=weightratio*probability;
+	weightratio/=fabs(amatrix_weight(amx));
+	acceptance_ratio=weightratio/extend_probability*squeeze_probability;
 
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<(1.0f/acceptance_ratio))?(true):(false);
 
 	if((is_accepted==false)&&(always_accept==false))
 	{
@@ -323,7 +125,7 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 	if(dimensions==1)
 		return UPDATE_UNPHYSICAL;
 
-	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
+	double weightratio=1.0f/fabs(amatrix_weight(amx));
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
@@ -353,16 +155,14 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 		Are we swapping rows or columns?
 	*/
 
-	int update[2],reverse[2];
-
 	switch(gsl_rng_uniform_int(amx->rng_ctx, 2))
 	{
 		case 0:
-		pmatrix_swap_rows(target, i, j, update, reverse, amx->rng_ctx);
+		pmatrix_swap_rows(target, i, j, amx->rng_ctx);
 		break;
 
 		case 1:
-		pmatrix_swap_cols(target, i, j, update, reverse, amx->rng_ctx);
+		pmatrix_swap_cols(target, i, j, amx->rng_ctx);
 		break;
 	}
 
@@ -370,12 +170,8 @@ int update_shuffle(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=fabs(amatrix_weight(amx).weight);
+	weightratio*=fabs(amatrix_weight(amx));
 	acceptance_ratio=weightratio;
-	acceptance_ratio*=pow(amx->nr_occupied, update[QTYPE_OCCUPIED]);
-	acceptance_ratio*=pow(amx->nr_virtual, update[QTYPE_VIRTUAL]);
-	acceptance_ratio/=pow(amx->nr_occupied, reverse[QTYPE_OCCUPIED]);
-	acceptance_ratio/=pow(amx->nr_virtual, reverse[QTYPE_VIRTUAL]);
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
 
@@ -395,7 +191,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions>=1);
 
-	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
+	double weightratio=1.0f/fabs(amatrix_weight(amx));
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
@@ -417,7 +213,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 
 		for(int j=0;j<dimensions;j++)
 			if(pmatrix_get_entry(target, i, j)!=0)
-				pmatrix_set_entry(target, i, j, pmatrix_get_new_value(target, amx->rng_ctx, i, j));
+				pmatrix_set_raw_entry(target, i, j, pmatrix_get_new_value(target, amx->rng_ctx, i, j));
 	}
 
 	amx->cached_weight_is_valid=false;
@@ -429,7 +225,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=fabs(amatrix_weight(amx).weight);
+	weightratio*=fabs(amatrix_weight(amx));
 	acceptance_ratio=weightratio;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
@@ -450,7 +246,7 @@ int update_swap(struct amatrix_t *amx, bool always_accept)
 	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
 	assert(amx->pmxs[0]->dimensions>=1);
 
-	double weightratio=1.0f/fabs(amatrix_weight(amx).weight);
+	double weightratio=1.0f/fabs(amatrix_weight(amx));
 
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
@@ -459,7 +255,7 @@ int update_swap(struct amatrix_t *amx, bool always_accept)
 		Do we play with virtual or with occupied states?
 	*/
 
-	int target_type=(gsl_rng_uniform_int(amx->rng_ctx, 2)==0) ? (QTYPE_OCCUPIED) : (QTYPE_VIRTUAL);
+	int target_type=(gsl_rng_uniform_int(amx->rng_ctx, 2)==0)?(QTYPE_OCCUPIED):(QTYPE_VIRTUAL);
 
 	struct
 	{
@@ -497,19 +293,17 @@ int update_swap(struct amatrix_t *amx, bool always_accept)
 	if(icandidates<2)
 		return UPDATE_UNPHYSICAL;
 
+	assert(icandidates<32);
+
 	int values[32];
 
 	for(int c=0;c<icandidates;c++)
-		values[c]=pmatrix_get_entry(amx->pmxs[candidates[c].pmatrix],candidates[c].i,candidates[c].j);
-
-	/*
-		TODO: Probably it would be better to use perfect probability distributions.
-	*/
+		values[c]=pmatrix_get_raw_entry(amx->pmxs[candidates[c].pmatrix],candidates[c].i,candidates[c].j);
 
 	fisher_yates(amx->rng_ctx,values,icandidates);
 
 	for(int c=0;c<icandidates;c++)
-		pmatrix_set_entry(amx->pmxs[candidates[c].pmatrix],candidates[c].i,candidates[c].j,values[c]);
+		pmatrix_set_raw_entry(amx->pmxs[candidates[c].pmatrix],candidates[c].i,candidates[c].j,values[c]);
 
 	amx->cached_weight_is_valid=false;
 
@@ -520,7 +314,7 @@ int update_swap(struct amatrix_t *amx, bool always_accept)
 
 	double acceptance_ratio;
 
-	weightratio*=fabs(amatrix_weight(amx).weight);
+	weightratio*=fabs(amatrix_weight(amx));
 	acceptance_ratio=weightratio;
 
 	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
@@ -618,6 +412,10 @@ int do_diagmc(struct configuration_t *config)
 	update_probability[3]=1;
 	update_probability[4]=1;
 
+	/*
+		Complementary updates must have the same associated probability
+	*/
+
 	assert(update_probability[0]==update_probability[1]);
 
 	/*
@@ -645,10 +443,6 @@ int do_diagmc(struct configuration_t *config)
 
 	alps::alea::autocorr_acc<double> autocorrelation(1);
 	alps::alea::batch_acc<double> overall_sign, signs[MAX_ORDER], plus[MAX_ORDER], minus[MAX_ORDER], orders[MAX_ORDER];
-
-#define	MAX_EXCITATIONS (16)
-
-	alps::alea::batch_acc<double> excitations[MAX_EXCITATIONS];
 
 	long int nr_samples, nr_physical_samples, nr_samples_by_order[MAX_ORDER], nr_positive_samples[MAX_ORDER], nr_negative_samples[MAX_ORDER];
 
@@ -689,7 +483,9 @@ int do_diagmc(struct configuration_t *config)
 		return 0;
 	}
 
-#warning Do we have a better way of doing this?
+	/*
+		Let's extend the matrix until we hit the minimum allowed dimensions.
+	*/
 
 	while(amx->pmxs[0]->dimensions<config->minorder)
 		update_extend(amx,true);
@@ -700,6 +496,10 @@ int do_diagmc(struct configuration_t *config)
 
 	keep_running=1;
 	signal(SIGINT,interrupt_handler);
+
+	/*
+		We initialize the progress bar
+	*/
 
 	progressbar *progress;
 
@@ -759,38 +559,17 @@ int do_diagmc(struct configuration_t *config)
 
 		nr_samples++;
 
-		if(false)
-		{
-			printf("================================\n");
-			amatrix_print(amx);
-			printf("--------------------------------\n");
-			pmatrix_print(amx->pmxs[0]);
-			printf("--------------------------------\n");
-			pmatrix_print(amx->pmxs[1]);
-			printf("--------------------------------\n");
-
-			if(amatrix_is_physical(amx)==true)
-				printf("PHYSICAL\n");
-			else
-				printf("UNPHYSICAL\n");
-
-			printf("================================\n");
-
-			char nil[1024];
-			gets(nil);
-		}
-
 		if(amatrix_is_physical(amx))
 		{
 			nr_physical_samples++;
 
 			if((counter>config->thermalization)&&((nr_physical_samples%config->decorrelation)==0))
 			{
-				struct amatrix_weight_t ws=amatrix_weight(amx);
-				double sign=(ws.weight>0.0f)?(1.0f):(-1.0f);
+				double weight=amatrix_weight(amx);
+				double sign=(weight>0.0f) ? (1.0f) : (-1.0f);
 				int order=amx->pmxs[0]->dimensions;
 
-				autocorrelation << ws.weight;
+				autocorrelation<<weight;
 				overall_sign << sign;
 				signs[order] << sign;
 
@@ -801,15 +580,9 @@ int do_diagmc(struct configuration_t *config)
 					minus[c] << ((c!=order) ? (0.0) : (negative_part(sign)));
 				}
 
-				{
-					int excitation_level=(order<=2)?(0):(ws.excitation_level);
-
-					excitations[excitation_level] << sign;
-				}
-
 				nr_samples_by_order[order]++;
 
-				if(ws.weight>=0.0)
+				if(weight>=0.0)
 				{
 					nr_positive_samples[order]++;
 				}
@@ -916,7 +689,6 @@ int do_diagmc(struct configuration_t *config)
 
 	alps::alea::autocorr_result<double> result_autocorrelation=autocorrelation.finalize();
 	alps::alea::batch_result<double> result_overall_sign, result_signs[MAX_ORDER], result_plus[MAX_ORDER],result_minus[MAX_ORDER], result_orders[MAX_ORDER];
-	alps::alea::batch_result<double> result_excitations[MAX_EXCITATIONS];
 
 	result_overall_sign=overall_sign.finalize();
 
@@ -931,9 +703,6 @@ int do_diagmc(struct configuration_t *config)
 
 	for(int c=0;c<MAX_ORDER;c++)
 		result_orders[c]=orders[c].finalize();
-
-	for(int c=0;c<MAX_EXCITATIONS;c++)
-		result_excitations[c]=excitations[c].finalize();
 
 	long int total_positive,total_negative;
 
@@ -1009,29 +778,9 @@ int do_diagmc(struct configuration_t *config)
 		}
 	}
 
-	for(int c=0;c<MAX_EXCITATIONS;c++)
-	{
-		fprintf(out,"Excitation level(%d): %f +- %f\n",c,result_excitations[c].mean()(0),result_excitations[c].stderror()(0));
-	}
-
 	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
 
-	//auto divide = [] (double x,double y) -> double { return x/y; };
-	//auto joined_data=alps::alea::join(result_signs[1],result_signs[2]);
-	//auto transformer=alps::alea::make_transformer(std::function<double(double,double)>(divide));
-	//auto ratio=alps::alea::transform(alps::alea::jackknife_prop(),transformer,joined_data);
-
-	/*
-		From the tutorial (https://github.com/ALPSCore/ALPSCore/wiki/Tutorial:-ALEA):
-
-		Functions of multiple random variables (X,Y) can be realized by grouping the arguments
-		together using alps::alea::join and then applying the transform on the combined result.
-	*/
-
-	//fprintf(out,"\nRatio is: %f\n",ratio.mean()(0));
-	//std::cout << ratio.mean() << std::endl;
-
-	fini_amatrix(amx);
+	fini_amatrix(amx,true);
 
 	if(out)
 		fclose(out);

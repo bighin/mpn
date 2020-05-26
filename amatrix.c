@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <assert.h>
 
 #include <gsl/gsl_matrix_int.h>
@@ -57,19 +56,17 @@ struct amatrix_t *init_amatrix(struct configuration_t *config)
 
 	ret->config=config;
 
-	ret->cached_weight.weight=0.0f;
-	ret->cached_weight.l=0;
-	ret->cached_weight.h=0;
+	ret->cached_weight=0.0f;
 	ret->cached_weight_is_valid=false;
 
 	return ret;
 }
 
-void fini_amatrix(struct amatrix_t *amx)
+void fini_amatrix(struct amatrix_t *amx,bool free_ectx)
 {
 	if(amx)
 	{
-		if(amx->ectx)
+		if((amx->ectx)&&(free_ectx==true))
 			free(amx->ectx);
 
 		fini_pmatrix(amx->pmxs[0]);
@@ -124,7 +121,7 @@ void amatrix_save(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 		}
 	}
 
-	memcpy(&backup->cached_result, &amx->cached_weight, sizeof(struct amatrix_weight_t));
+	backup->cached_result=amx->cached_weight;
 	backup->cached_result_is_valid=amx->cached_weight_is_valid;
 }
 
@@ -145,40 +142,8 @@ void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 		}
 	}
 
-	memcpy(&amx->cached_weight, &backup->cached_result, sizeof(struct amatrix_weight_t));
+	amx->cached_weight=backup->cached_result;
 	amx->cached_weight_is_valid=backup->cached_result_is_valid;
-}
-
-/*
-	Printing an 'amatrix'
-*/
-
-void amatrix_print(struct amatrix_t *amx)
-{
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
-	assert(amx->pmxs[0]->dimensions>=1);
-
-	for(int i=0;i<dimensions;i++)
-	{
-		for(int j=0;j<dimensions;j++)
-		{
-			int entry=0;
-
-			if(pmatrix_get_entry(amx->pmxs[0], i, j)!=0)
-				entry++;
-
-			if(pmatrix_get_entry(amx->pmxs[1], i, j)!=0)
-				entry++;
-
-			printf("%d ",entry);
-		}
-		
-		printf("\n");
-	}
-	
-	fflush(stdout);
 }
 
 /*
@@ -233,6 +198,38 @@ bool amatrix_is_physical(struct amatrix_t *amx)
 	return true;
 }
 
+/*
+	Printing an 'amatrix', in various formats
+*/
+
+void amatrix_print(struct amatrix_t *amx)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
+	assert(amx->pmxs[0]->dimensions>=1);
+
+	for(int i=0;i<dimensions;i++)
+	{
+		for(int j=0;j<dimensions;j++)
+		{
+			int entry=0;
+
+			if(pmatrix_get_entry(amx->pmxs[0], i, j)!=0)
+				entry++;
+
+			if(pmatrix_get_entry(amx->pmxs[1], i, j)!=0)
+				entry++;
+
+			printf("%d ",entry);
+		}
+
+		printf("\n");
+	}
+
+	fflush(stdout);
+}
+
 void amatrix_to_python(struct amatrix_t *amx)
 {
 	int dimensions=amx->pmxs[0]->dimensions;
@@ -258,6 +255,7 @@ void amatrix_to_python(struct amatrix_t *amx)
 	}
 
 	printf("]\n");
+	fflush(stdout);
 }
 
 void amatrix_to_wolfram(struct amatrix_t *amx)
@@ -285,7 +283,12 @@ void amatrix_to_wolfram(struct amatrix_t *amx)
 	}
 
 	printf("}\n");
+	fflush(stdout);
 }
+
+/*
+	Checks if the amatrix represents a connected graph
+*/
 
 bool actual_amatrix_check_connectedness(struct amatrix_t *amx)
 {
