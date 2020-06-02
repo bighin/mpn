@@ -7,7 +7,6 @@
 #include "cache.h"
 #include "mc.h"
 
-
 void usage(char *argv0)
 {
 	printf("Usage: %s <inifile> [<otherinifiles> ...]\n",argv0);
