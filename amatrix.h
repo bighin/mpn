@@ -2,6 +2,7 @@
 #define __AMATRIX_H__
 
 #include <stdbool.h>
+#include <gsl/gsl_matrix_int.h>
 #include <gsl/gsl_rng.h>
 
 #include "pmatrix.h"
@@ -71,9 +72,11 @@ bool amatrix_check_consistency(struct amatrix_t *amx);
 bool amatrix_is_physical(struct amatrix_t *amx);
 
 void amatrix_print(struct amatrix_t *amx);
+void amatrix_print_detailed(struct amatrix_t *amx);
 void amatrix_to_python(struct amatrix_t *amx);
 void amatrix_to_wolfram(struct amatrix_t *amx);
 
+bool gsl_matrix_int_check_connectedness(gsl_matrix_int *adjacency,int dimensions);
 bool actual_amatrix_check_connectedness(struct amatrix_t *amx);
 bool amatrix_check_connectedness(struct amatrix_t *amx);
 

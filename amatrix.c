@@ -230,6 +230,36 @@ void amatrix_print(struct amatrix_t *amx)
 	fflush(stdout);
 }
 
+void amatrix_print_detailed(struct amatrix_t *amx)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
+	assert(amx->pmxs[0]->dimensions>=1);
+
+	for(int i=0;i<dimensions;i++)
+	{
+		for(int j=0;j<dimensions;j++)
+		{
+			int x=pmatrix_get_entry(amx->pmxs[0], i, j);
+			int y=pmatrix_get_entry(amx->pmxs[1], i, j);
+
+			if((x==0)&&(y==0))
+				printf("0");
+			else if((x==0)&&(y!=0))
+				printf("1[%d]",y);
+			else if((x!=0)&&(y==0))
+				printf("1[%d]",x);
+			else if((x!=0)&&(y!=0))
+				printf("2[%d,%d]",x,y);
+		}
+
+		printf("\n");
+	}
+
+	fflush(stdout);
+}
+
 void amatrix_to_python(struct amatrix_t *amx)
 {
 	int dimensions=amx->pmxs[0]->dimensions;
@@ -290,33 +320,12 @@ void amatrix_to_wolfram(struct amatrix_t *amx)
 	Checks if the amatrix represents a connected graph
 */
 
-bool actual_amatrix_check_connectedness(struct amatrix_t *amx)
+bool gsl_matrix_int_check_connectedness(gsl_matrix_int *adjacency,int dimensions)
 {
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	assert(dimensions>=1);
-	if(dimensions==1)
-		return true;
-
 	bool result=true;
 
-	gsl_matrix_int *adjacency=gsl_matrix_int_alloc(dimensions, dimensions);
-
-	for(int i=0;i<dimensions;i++)
-	{
-		for(int j=0;j<dimensions;j++)
-		{
-			int value=0;
-
-			if(amx->pmxs[0]->values[i][j]!=0)
-				value++;
-
-			if(amx->pmxs[1]->values[i][j]!=0)
-				value++;
-
-			gsl_matrix_int_set(adjacency, i, j, value);
-		}
-	}
+	if(dimensions==1)
+		return true;
 
 	gsl_matrix_int *powers=gsl_matrix_int_alloc(dimensions, dimensions);
 	gsl_matrix_int *tmp=gsl_matrix_int_alloc(dimensions, dimensions);
@@ -353,6 +362,38 @@ bool actual_amatrix_check_connectedness(struct amatrix_t *amx)
 	gsl_matrix_int_free(C);
 	gsl_matrix_int_free(tmp);
 	gsl_matrix_int_free(powers);
+
+	return result;
+}
+
+bool actual_amatrix_check_connectedness(struct amatrix_t *amx)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(dimensions>=1);
+	if(dimensions==1)
+		return true;
+
+	gsl_matrix_int *adjacency=gsl_matrix_int_alloc(dimensions, dimensions);
+
+	for(int i=0;i<dimensions;i++)
+	{
+		for(int j=0;j<dimensions;j++)
+		{
+			int value=0;
+
+			if(amx->pmxs[0]->values[i][j]!=0)
+				value++;
+
+			if(amx->pmxs[1]->values[i][j]!=0)
+				value++;
+
+			gsl_matrix_int_set(adjacency, i, j, value);
+		}
+	}
+
+	bool result=gsl_matrix_int_check_connectedness(adjacency,dimensions);
+
 	gsl_matrix_int_free(adjacency);
 
 	return result;

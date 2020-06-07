@@ -13,7 +13,7 @@
 	having modified a quantum number
 */
 
-struct amatrix_weight_info_t
+struct weight_info_t
 {
 	/*
 		This information can be used to reconstruct the weight, given the labels.
@@ -43,10 +43,10 @@ struct amatrix_weight_info_t
 	int ilabels;
 };
 
-struct amatrix_weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx);
+struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx);
 
-double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_info_t *awt);
+double reconstruct_weight(struct amatrix_t *amx, struct weight_info_t *awt);
 
 int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int pmatrix);
 
-#endif //__WEIGHS2_H__
+#endif //__WEIGHT2_H__

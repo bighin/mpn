@@ -1,14 +1,3 @@
-/*
-	Note that this file is almost entirely C, we compile it as C++ since
-	we want to use the ALEA library from ALPSCore.
-*/
-
-#include <alps/alea.hpp>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <math.h>
 #include <assert.h>
 #include <sys/time.h>
@@ -24,6 +13,7 @@ extern "C" {
 #include "config.h"
 #include "permutations.h"
 #include "weight.h"
+#include "sampling.h"
 
 #include "libprogressbar/progressbar.h"
 
@@ -349,26 +339,26 @@ void show_update_statistics(FILE *out,long int proposed,long int accepted,long i
 	fprintf(out,"proposed %ld, accepted %ld (%f%%), rejected %ld (%f%%).\n",proposed,accepted,accepted_pct,rejected,rejected_pct);
 }
 
-void order_description(char *buf,int length,int order)
-{
-	if(order==1)
-		snprintf(buf,length,"HF");
-	else
-		snprintf(buf,length,"MP%d",order);
-
-	buf[length-1]='\0';
-}
-
 static volatile int keep_running=1;
+static volatile int print_summary=0;
 
-void interrupt_handler(int dummy __attribute__((unused)))
+static void signal_handler(int signo)
 {
-	keep_running=0;
-}
+	switch(signo)
+	{
 
-#ifdef __cplusplus
+		case SIGINT:
+		keep_running=0;
+		break;
+
+		case SIGUSR1:
+		print_summary=1;
+		break;
+
+		default:
+		break;
+	}
 }
-#endif
 
 /*
 	The actual DiagMC routine.
@@ -402,7 +392,7 @@ int do_diagmc(struct configuration_t *config)
 	update_names[4]="Swap";
 
 	/*
-		Update probabilities: note that they must be the same for symmetric updates,
+		Update probabilities: note that they must be the same for complementary update pairs,
 		see the assert() below.
 	*/
 
@@ -411,10 +401,6 @@ int do_diagmc(struct configuration_t *config)
 	update_probability[2]=1;
 	update_probability[3]=1;
 	update_probability[4]=1;
-
-	/*
-		Complementary updates must have the same associated probability
-	*/
 
 	assert(update_probability[0]==update_probability[1]);
 
@@ -428,28 +414,13 @@ int do_diagmc(struct configuration_t *config)
 		cumulative_probability[c]=update_probability[c]+cumulative_probability[c-1];
 
 	/*
-		We reset the update statistics
+		We reset the update statistics and prepare a sampling context for the measurements
 	*/
 
 	for(int d=0;d<DIAGRAM_NR_UPDATES;d++)
 		proposed[d]=accepted[d]=rejected[d]=0;
 
-	/*
-		We initialize the accumulators and variables we will use for performing measurements.
-	*/
-
-	assert(config->maxorder>config->minorder);
-	assert(config->maxorder<MAX_ORDER);
-
-	alps::alea::autocorr_acc<double> autocorrelation(1);
-	alps::alea::batch_acc<double> overall_sign, signs[MAX_ORDER], plus[MAX_ORDER], minus[MAX_ORDER], orders[MAX_ORDER];
-
-	long int nr_samples, nr_physical_samples, nr_samples_by_order[MAX_ORDER], nr_positive_samples[MAX_ORDER], nr_negative_samples[MAX_ORDER];
-
-	nr_samples=nr_physical_samples=0;
-
-	for(int c=0;c<MAX_ORDER;c++)
-		nr_samples_by_order[c]=nr_positive_samples[c]=nr_negative_samples[c]=0;
+	struct sampling_ctx_t *sctx=init_sampling_ctx(config->maxorder);
 
 	/*
 		We print some informative message, and then we open the log file
@@ -487,15 +458,22 @@ int do_diagmc(struct configuration_t *config)
 		Let's extend the matrix until we hit the minimum allowed dimensions.
 	*/
 
+	assert(config->maxorder>config->minorder);
+	assert(config->maxorder<MAX_ORDER);
+
 	while(amx->pmxs[0]->dimensions<config->minorder)
 		update_extend(amx,true);
 
 	/*
-		We setup an interrupt handler to gracefully handle a CTRL-C.
+		We setup a signal handler to gracefully handle a CTRL-C (i.e. SIGINT),
+		and to print a short summary on SIGUSR1.
 	*/
 
 	keep_running=1;
-	signal(SIGINT,interrupt_handler);
+	print_summary=0;
+
+	signal(SIGINT,signal_handler);
+	signal(SIGUSR1,signal_handler);
 
 	/*
 		We initialize the progress bar
@@ -557,41 +535,7 @@ int do_diagmc(struct configuration_t *config)
 			assert(false);
 		}
 
-		nr_samples++;
-
-		if(amatrix_is_physical(amx))
-		{
-			nr_physical_samples++;
-
-			if((counter>config->thermalization)&&((nr_physical_samples%config->decorrelation)==0))
-			{
-				double weight=amatrix_weight(amx);
-				double sign=(weight>0.0f) ? (1.0f) : (-1.0f);
-				int order=amx->pmxs[0]->dimensions;
-
-				autocorrelation<<weight;
-				overall_sign << sign;
-				signs[order] << sign;
-
-				for(int c=0;c<MAX_ORDER;c++)
-				{
-					orders[c] << ((c!=order) ? (0.0) : (sign));
-					plus[c] << ((c!=order) ? (0.0) : (positive_part(sign)));
-					minus[c] << ((c!=order) ? (0.0) : (negative_part(sign)));
-				}
-
-				nr_samples_by_order[order]++;
-
-				if(weight>=0.0)
-				{
-					nr_positive_samples[order]++;
-				}
-				else
-				{
-					nr_negative_samples[order]++;
-				}
-			}
-		}
+		sampling_ctx_measure(sctx,amx,config,counter);
 
 		if((counter%262144)==0)
 		{
@@ -609,6 +553,12 @@ int do_diagmc(struct configuration_t *config)
 
 			if((config->timelimit>0.0f)&&(elapsedtime>config->timelimit))
 				keep_running=0;
+
+			if(print_summary==1)
+			{
+				sampling_ctx_print_report(sctx,amx,stdout,false);
+				print_summary=0;
+			}
 		}
 	}
 
@@ -639,7 +589,7 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Iterations (done/planned): %ld/%ld\n",counter,config->iterations);
 	fprintf(out,"# Thermalization: %ld\n",config->thermalization);
 	fprintf(out,"# Decorrelation: %d\n",config->decorrelation);
-	fprintf(out,"# Iterations in the physical sector: %f%%\n",100.0f*((double)(nr_physical_samples))/((double)(nr_samples)));
+	fprintf(out,"# Iterations in the physical sector: %f%%\n",sampling_ctx_get_physical_pct(sctx));
 	fprintf(out,"#\n");
 
 	/*
@@ -682,105 +632,17 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"#\n");
 
 	/*
-		Finally, we output the actual results.
+		Finally, we output the actual results...
 	*/
 
-	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Positive fraction> <Negative fraction> <Sign (from ALEA)>\n");
+	sampling_ctx_print_report(sctx,amx,out,true);
 
-	alps::alea::autocorr_result<double> result_autocorrelation=autocorrelation.finalize();
-	alps::alea::batch_result<double> result_overall_sign, result_signs[MAX_ORDER], result_plus[MAX_ORDER],result_minus[MAX_ORDER], result_orders[MAX_ORDER];
-
-	result_overall_sign=overall_sign.finalize();
-
-	for(int c=0;c<MAX_ORDER;c++)
-		result_signs[c]=signs[c].finalize();
-
-	for(int c=0;c<MAX_ORDER;c++)
-		result_plus[c]=plus[c].finalize();
-
-	for(int c=0;c<MAX_ORDER;c++)
-		result_minus[c]=minus[c].finalize();
-
-	for(int c=0;c<MAX_ORDER;c++)
-		result_orders[c]=orders[c].finalize();
-
-	long int total_positive,total_negative;
-
-	total_positive=total_negative=0;
-	for(int order=amx->config->minorder;order<=amx->config->maxorder;order++)
-	{
-		total_positive+=nr_positive_samples[order];
-		total_negative+=nr_negative_samples[order];
-	}
-
-	for(int order=amx->config->minorder;order<=amx->config->maxorder;order++)
-	{
-		double pct,sign;
-
-		if((total_positive-total_negative)!=0)
-			pct=100.0f*((double)(nr_positive_samples[order]-nr_negative_samples[order]))/(total_positive-total_negative);
-		else
-			pct=NAN;
-
-		if((nr_positive_samples[order]+nr_negative_samples[order])!=0)
-			sign=((double)(nr_positive_samples[order]-nr_negative_samples[order]))/((double)(nr_positive_samples[order]+nr_negative_samples[order]));
-		else
-			sign=NAN;
-
-		fprintf(out, "%d %ld %ld %f %f ", order, nr_positive_samples[order], nr_negative_samples[order], pct, sign);
-
-		fprintf(out,"%f+-%f %f+-%f ",result_plus[order].mean()(0),result_plus[order].stderror()(0),
-			                     result_minus[order].mean()(0),result_minus[order].stderror()(0));
-
-		/*
-			Remember that result_signs[order].mean() has type alps::alea::column
-			which is a shorthand for Eigen::column
-		*/
-
-		fprintf(out, "%f+-%f\n",result_signs[order].mean()(0),result_signs[order].stderror()(0));
-	}
-
-	fprintf(out,"# Overall sign: %f+-%f\n",result_overall_sign.mean()(0),result_overall_sign.stderror()(0));
-	fprintf(out,"# Order-by-order ratios:\n");
-
-	for(int order1=amx->config->minorder;order1<=amx->config->maxorder;order1++)
-	{
-		for(int order2=amx->config->minorder;order2<=amx->config->maxorder;order2++)
-		{
-			if(order1==order2)
-				continue;
-
-			/*
-				We calculate the contributions at each order, their standard error,
-				and then we calculation the ratio and its error using the usual
-				error propagation formula.
-			*/
-
-			double phi1,phi2,sigmaphi1,sigmaphi2;
-
-			phi1=result_orders[order1].mean()(0);
-			phi2=result_orders[order2].mean()(0);
-
-			sigmaphi1=result_orders[order1].stderror()(0);
-			sigmaphi2=result_orders[order2].stderror()(0);
-
-			char desc1[128],desc2[128];
-
-			order_description(desc1,128,order1);
-			order_description(desc2,128,order2);
-
-			double ratio, sigmaratio;
-
-			ratio=phi1/phi2;
-			sigmaratio=ratio*sqrt(pow(sigmaphi1/phi1,2.0f)+pow(sigmaphi2/phi2,2.0f));
-
-			fprintf(out,"%s/%s %f +- %f (%f%%)\n", desc1, desc2, ratio, sigmaratio, 100.0f*sigmaratio/ratio);
-		}
-	}
-
-	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
+	/*
+		...and we perform some final cleanups!
+	*/
 
 	fini_amatrix(amx,true);
+	fini_sampling_ctx(sctx);
 
 	if(out)
 		fclose(out);

@@ -4,9 +4,14 @@
 #include <gsl/gsl_matrix.h>
 #include <gsl/gsl_rng.h>
 
+#include "pmatrix.h"
+
 int get_permutation_index(const int *permutation,int length);
+
 gsl_matrix_int *permutation_to_matrix(const int *permutation,int dimensions);
 void matrix_to_permutation(gsl_matrix_int *m,int *permutation);
+
+void pmatrix_to_permutation(struct pmatrix_t *m,int *permutation);
 
 extern int permutations2[2][2];
 extern int permutations3[6][3];

@@ -1,10 +1,8 @@
-- At some point the precision with which we load the ERIs will likely be important!
+- Maybe at some point the precision with which we load the ERIs will likely be important!
 
 - No calls to gsl_matrix_int_alloc(), just reuse a number of preallocated
   matrices of different dimensions, of course remembering to zero them.
 
 - One could cache the result of count_loops(), as well.
 
-- If not used, remove the Lindel�f factor
-
-- Even the 'bias' could be removed or rethought.
+- If not used, remove the Lindeloef factor

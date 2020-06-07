@@ -8,7 +8,7 @@
 #include "multiplicity.h"
 #include "auxx.h"
 
-void add_denominator_entry(struct amatrix_weight_info_t *awt, int label, int qtype)
+void add_denominator_entry(struct weight_info_t *awt, int label, int qtype)
 {
 	int index=awt->denominators[awt->nr_denominators].ilabels;
 
@@ -17,7 +17,7 @@ void add_denominator_entry(struct amatrix_weight_info_t *awt, int label, int qty
 	awt->denominators[awt->nr_denominators].ilabels++;
 }
 
-void add_numerator(struct amatrix_weight_info_t *awt,int l1,int l2,int l3,int l4)
+void add_numerator(struct weight_info_t *awt, int l1, int l2, int l3, int l4)
 {
 	awt->numerators[awt->nr_numerators].labels[0]=l1;
 	awt->numerators[awt->nr_numerators].labels[1]=l2;
@@ -26,7 +26,7 @@ void add_numerator(struct amatrix_weight_info_t *awt,int l1,int l2,int l3,int l4
 	awt->nr_numerators++;
 }
 
-void add_unphysical_penalty(struct amatrix_weight_info_t *awt,double penalty)
+void add_unphysical_penalty(struct weight_info_t *awt, double penalty)
 {
 	awt->unphysical_penalty*=penalty;
 }
@@ -35,7 +35,7 @@ void add_unphysical_penalty(struct amatrix_weight_info_t *awt,double penalty)
 	This function calculates a diagram's weight given the incidence matrix
 */
 
-struct amatrix_weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx)
+struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx)
 {
 	int mels[MAX_MATRIX_ELEMENTS][4];
 	assert(B->size1<=MAX_MATRIX_ELEMENTS);
@@ -105,7 +105,7 @@ struct amatrix_weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct 
 		additional information, allowing one to reconstruct the weight from scratch.
 	*/
 
-	struct amatrix_weight_info_t ret;
+	struct weight_info_t ret;
 
 	ret.nr_denominators=0;
 	ret.nr_numerators=0;
@@ -116,7 +116,6 @@ struct amatrix_weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct 
 	*/
 
 	double denominators=1.0f;
-	int excitation_level=0;
 
 	for(size_t i=0;i<(B->size1-1);i++)
 	{
@@ -225,7 +224,7 @@ struct amatrix_weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct 
 	}
 
 	/*
-		Finally we put all the results into an 'amatrix_weight_info_t' struct and
+		Finally we put all the results into an 'weight_info_t' struct and
 		we return it.
 	*/
 
@@ -239,6 +238,14 @@ struct amatrix_weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct 
 #ifndef NDEBUG
 	{
 		double w1=reconstruct_weight(amx,&ret);
+
+		/*
+			We have to reset this, since count_loops() will be invoked again in incidence_to_weight()
+		*/
+
+		for(int c=0;c<*ilabels;c++)
+			labels[c].visited=false;
+
 		double w2=incidence_to_weight(B,labels,ilabels,amx);
 
 		assert(gsl_fcmp(w1,w2,1e-6)==0);
@@ -248,7 +255,7 @@ struct amatrix_weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct 
 	return ret;
 }
 
-double reconstruct_weight(struct amatrix_t *amx, struct amatrix_weight_info_t *awt)
+double reconstruct_weight(struct amatrix_t *amx, struct weight_info_t *awt)
 {
 	/*
 		Keep in mind that here we do not check for connectedness.
