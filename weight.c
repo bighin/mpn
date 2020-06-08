@@ -616,8 +616,6 @@ double amatrix_weight(struct amatrix_t *amx)
 			nr_weights++;
 		}
 
-		fini_collection(acl);
-
 		if(false)
 		{
 			double R=fabs(ret)/Rdenominator;
@@ -632,6 +630,8 @@ double amatrix_weight(struct amatrix_t *amx)
 			for(int d=0;c<d;d++)
 				if(amatrix_ordering(acl->amatrices[c],acl->amatrices[d])==ORDERING_EQ)
 					combinatorial*=2.0f;
+
+		fini_collection(acl);
 
 		if(nr_weights==0)
 		{
