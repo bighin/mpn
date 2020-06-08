@@ -387,7 +387,8 @@ void order_description(char *buf,int length,int order)
 
 void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx,FILE *out,bool finalize)
 {
-	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Positive fraction> <Negative fraction> <Sign (from ALEA)>\n");
+	fprintf(out,
+		"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Positive fraction> <Negative fraction> <Sign (from ALEA)>\n");
 
 	alps::alea::autocorr_result<double> result_autocorrelation;
 
@@ -402,10 +403,11 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 
 	for(int c=0;c<MAX_ORDER;c++)
 	{
-		result_topologies[c]=(alps::alea::batch_result<double> *)(malloc(sizeof(alps::alea::batch_result<double>)*sctx->nr_of_bins[c]));
+		result_topologies[c]=(alps::alea::batch_result<double> *)(malloc(
+			sizeof(alps::alea::batch_result<double>)*sctx->nr_of_bins[c]));
 
 		for(int d=0;d<sctx->nr_of_bins[c];d++)
-			new (result_topologies[c]+d) alps::alea::batch_result<double>;
+			new(result_topologies[c]+d) alps::alea::batch_result<double>;
 	}
 
 	if(finalize==true)
@@ -449,7 +451,7 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 				result_topologies[c][d]=sctx->topologies[c][d]->result();
 	}
 
-	long int total_positive,total_negative;
+	long int total_positive, total_negative;
 
 	total_positive=total_negative=0;
 	for(int order=amx->config->minorder;order<=amx->config->maxorder;order++)
@@ -460,33 +462,36 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 
 	for(int order=amx->config->minorder;order<=amx->config->maxorder;order++)
 	{
-		double pct,sign;
+		double pct, sign;
 
 		if((total_positive-total_negative)!=0)
-			pct=100.0f*((double)(sctx->nr_positive_samples[order]-sctx->nr_negative_samples[order]))/(total_positive-total_negative);
+			pct=100.0f*((double)(sctx->nr_positive_samples[order]-sctx->nr_negative_samples[order]))/
+				(total_positive-total_negative);
 		else
 			pct=NAN;
 
 		if((sctx->nr_positive_samples[order]+sctx->nr_negative_samples[order])!=0)
-			sign=((double)(sctx->nr_positive_samples[order]-sctx->nr_negative_samples[order]))/((double)(sctx->nr_positive_samples[order]+sctx->nr_negative_samples[order]));
+			sign=((double)(sctx->nr_positive_samples[order]-sctx->nr_negative_samples[order]))/
+				((double)(sctx->nr_positive_samples[order]+sctx->nr_negative_samples[order]));
 		else
 			sign=NAN;
 
-		fprintf(out, "%d %ld %ld %f %f ", order, sctx->nr_positive_samples[order], sctx->nr_negative_samples[order], pct, sign);
+		fprintf(out, "%d %ld %ld %f %f ", order, sctx->nr_positive_samples[order],
+			sctx->nr_negative_samples[order], pct, sign);
 
-		fprintf(out,"%f+-%f %f+-%f ",result_plus[order].mean()(0),result_plus[order].stderror()(0),
-			result_minus[order].mean()(0),result_minus[order].stderror()(0));
+		fprintf(out, "%f+-%f %f+-%f ", result_plus[order].mean()(0), result_plus[order].stderror()(0),
+			result_minus[order].mean()(0), result_minus[order].stderror()(0));
 
 		/*
 			Remember that result_signs[order].mean() has type alps::alea::column
 			which is a shorthand for Eigen::column
 		*/
 
-		fprintf(out, "%f+-%f\n",result_signs[order].mean()(0),result_signs[order].stderror()(0));
+		fprintf(out, "%f+-%f\n", result_signs[order].mean()(0), result_signs[order].stderror()(0));
 	}
 
-	fprintf(out,"# Overall sign: %f+-%f\n",result_overall_sign.mean()(0),result_overall_sign.stderror()(0));
-	fprintf(out,"# Order-by-order ratios:\n");
+	fprintf(out, "# Overall sign: %f +- %f\n", result_overall_sign.mean()(0), result_overall_sign.stderror()(0));
+	fprintf(out, "# Order-by-order ratios:\n");
 
 	for(int order1=amx->config->minorder;order1<=amx->config->maxorder;order1++)
 	{
@@ -501,7 +506,7 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 				error propagation formula.
 			*/
 
-			double phi1,phi2,sigmaphi1,sigmaphi2;
+			double phi1, phi2, sigmaphi1, sigmaphi2;
 
 			phi1=result_orders[order1].mean()(0);
 			phi2=result_orders[order2].mean()(0);
@@ -509,50 +514,57 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 			sigmaphi1=result_orders[order1].stderror()(0);
 			sigmaphi2=result_orders[order2].stderror()(0);
 
-			char desc1[128],desc2[128];
+			char desc1[128], desc2[128];
 
-			order_description(desc1,128,order1);
-			order_description(desc2,128,order2);
+			order_description(desc1, 128, order1);
+			order_description(desc2, 128, order2);
 
 			double ratio, sigmaratio;
 
 			ratio=phi1/phi2;
-			sigmaratio=ratio*sqrt(pow(sigmaphi1/phi1,2.0f)+pow(sigmaphi2/phi2,2.0f));
+			sigmaratio=ratio*sqrt(pow(sigmaphi1/phi1, 2.0f)+pow(sigmaphi2/phi2, 2.0f));
 
-			fprintf(out,"%s/%s %f +- %f (%f%%)\n", desc1, desc2, ratio, sigmaratio, 100.0f*sigmaratio/ratio);
+			fprintf(out, "%s/%s %f +- %f (%f%%)\n", desc1, desc2, ratio, sigmaratio,
+				100.0f*sigmaratio/ratio);
 		}
 	}
 
-	fprintf(out,"# Topology-by-topology ratios:\n");
+	fprintf(out, "# Topology-by-topology ratios:\n");
 
-	double ratios=0.0f,sigmaratios=0.0f;
-
-	for(int d=0;d<sctx->nr_of_bins[4];d++)
+	for(int order=3;order<=sctx->maxdimensions;order++)
 	{
-		double phi1,phi2,sigmaphi1,sigmaphi2;
+		double ratios=0.0f, sigmaratios=0.0f;
 
-		phi1=result_topologies[4][d].mean()(0);
-		phi2=result_orders[2].mean()(0);
+		fprintf(out, "# MP%d\n",order);
 
-		sigmaphi1=result_topologies[4][d].stderror()(0);
-		sigmaphi2=result_orders[2].stderror()(0);
+		for(int d=0;d<sctx->nr_of_bins[order];d++)
+		{
+			double phi1, phi2, sigmaphi1, sigmaphi2;
 
-		double ratio, sigmaratio;
+			phi1=result_topologies[order][d].mean()(0);
+			phi2=result_orders[2].mean()(0);
 
-		ratio=phi1/phi2;
-		sigmaratio=ratio*sqrt(pow(sigmaphi1/phi1,2.0f)+pow(sigmaphi2/phi2,2.0f));
+			sigmaphi1=result_topologies[order][d].stderror()(0);
+			sigmaphi2=result_orders[2].stderror()(0);
 
-		ratios+=ratio;
-		sigmaratios+=sigmaratio*sigmaratio;
+			double ratio, sigmaratio;
 
-		char buf[256];
+			ratio=phi1/phi2;
+			sigmaratio=ratio*sqrt(pow(sigmaphi1/phi1, 2.0f)+pow(sigmaphi2/phi2, 2.0f));
 
-		fprintf(out,"MP4(%s)/MP2 %f +- %f (%f%%)\n",get_bin_description(sctx,4,d,buf),ratio,sigmaratio,100.0f*sigmaratio/ratio);
+			ratios+=ratio;
+			sigmaratios+=sigmaratio*sigmaratio;
+
+			char buf[256];
+
+			fprintf(out, "MP%d(%s)/MP2 %f +- %f (%f%%)\n", order, get_bin_description(sctx, order, d, buf),
+				ratio, sigmaratio, 100.0f*sigmaratio/ratio);
+		}
+
+		sigmaratios=sqrt(sigmaratios);
+
+		fprintf(out, "MP%d(all)/MP2 %f +- %f (%f%%)\n", order, ratios, sigmaratios, 100.0f*sigmaratios/ratios);
 	}
-
-	sigmaratios=sqrt(sigmaratios);
-
-	fprintf(out,"MP4(all)/MP2 %f +- %f (%f%%)\n",ratios,sigmaratios,100.0f*sigmaratios/ratios);
 
 	for(int c=0;c<MAX_ORDER;c++)
 	{
