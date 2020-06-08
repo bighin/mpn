@@ -577,7 +577,7 @@ double amatrix_weight(struct amatrix_t *amx)
 		double ret,combinatorial,Rdenominator;
 		int nr_weights;
 
-		cdet_generate_grouping_altL1(amx, acl);
+		cdet_generate_grouping_altL0(amx, acl);
 
 		combinatorial=1.0f;
 		ret=Rdenominator=0.0f;

@@ -101,7 +101,7 @@ void load_config_defaults(struct configuration_t *config)
 	config->unphysicalpenalty=0.01f;
 	config->minorder=1;
 	config->minorder=8;
-	config->epsilon=0.1f;
+	config->epsilon=0.0f;
 
 	config->iterations=10000000;
 	config->thermalization=config->iterations/100;

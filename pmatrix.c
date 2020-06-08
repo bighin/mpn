@@ -17,6 +17,10 @@ struct pmatrix_t *init_pmatrix(int nr_occupied,int nr_virtual,gsl_rng *rngctx)
 	ret->nr_occupied=nr_occupied;
 	ret->nr_virtual=nr_virtual;
 
+	for(int i=0;i<PMATRIX_MAX_DIMENSIONS;i++)
+		for(int j=0;j<PMATRIX_MAX_DIMENSIONS;j++)
+			ret->values[i][j]=0;
+
 	ret->values[0][0]=pmatrix_get_new_value(ret, rngctx, 0, 0);
 	ret->values[1][1]=pmatrix_get_new_value(ret, rngctx, 1, 1);
 
