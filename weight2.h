@@ -37,10 +37,12 @@ struct weight_info_t
 	numerators[MAX_NUMERATORS];
 	int nr_numerators;
 
-	double inversefactor,unphysical_penalty;
+	double inversefactor,unphysical_penalty,weight;
 
 	struct label_t labels[MAX_LABELS];
 	int ilabels;
+
+	int excitation_level;
 };
 
 struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx);
@@ -48,5 +50,7 @@ struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t 
 double reconstruct_weight(struct amatrix_t *amx, struct weight_info_t *awt);
 
 int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int pmatrix);
+
+int get_excitation_level(struct amatrix_t *amx);
 
 #endif //__WEIGHT2_H__

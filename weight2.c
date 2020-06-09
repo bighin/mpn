@@ -116,6 +116,7 @@ struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t 
 	*/
 
 	double denominators=1.0f;
+	int excitation_level=0;
 
 	for(size_t i=0;i<(B->size1-1);i++)
 	{
@@ -161,8 +162,12 @@ struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t 
 		{
 			denominators*=denominator;
 			ret.nr_denominators++;
+
+			excitation_level=MAX(excitation_level,energies_in_denominator/2);
 		}
 	}
+
+	ret.excitation_level=excitation_level;
 
 	/*
 		Additional rule: phase factor
@@ -234,6 +239,7 @@ struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t 
 	ret.l=l;
 	ret.h=h;
 	ret.inversefactor=inversefactor;
+	ret.weight=pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
 
 #ifndef NDEBUG
 	{
@@ -326,4 +332,25 @@ int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int
 
 	assert(false);
 	return 0;
+}
+
+int get_excitation_level(struct amatrix_t *amx)
+{
+	struct label_t labels[MAX_LABELS];
+	int ilabels=0;
+
+#warning This result could be cached with the weight
+
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	if(dimensions==1)
+		return 0;
+	else if(dimensions==2)
+		return 2;
+
+	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, labels, &ilabels);
+	struct weight_info_t w=incidence_to_weight_info(incidence, labels, &ilabels, amx);
+	gsl_matrix_int_free(incidence);
+
+	return w.excitation_level;
 }

@@ -12,13 +12,16 @@ extern "C" {
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
+#include <gsl/gsl_math.h>
 
 #include "amatrix.h"
 #include "weight.h"
+#include "weight2.h"
 #include "permutations.h"
 #include "cache.h"
 #include "sampling.h"
 #include "auxx.h"
+#include "limits.h"
 
 #ifdef __cplusplus
 }
@@ -81,18 +84,38 @@ bool matrices_in_same_bin(gsl_matrix_int *a,gsl_matrix_int *b)
 {
 	bool result=false;
 
-	gsl_matrix_int *aT=gsl_matrix_int_alloc(a->size2,a->size1);
+	assert(a->size1==a->size2);
+	assert(b->size1==b->size2);
+	assert(a->size1==b->size1);
 
-	for(size_t i=0;i<aT->size1;i++)
-		for(size_t j=0;j<aT->size2;j++)
-			gsl_matrix_int_set(aT,i,j,gsl_matrix_int_get(a,j,i));
+	size_t dimensions=a->size1;
+
+	gsl_matrix_int *aT=gsl_matrix_int_alloc(dimensions,dimensions);
+	gsl_matrix_int *aprime=gsl_matrix_int_alloc(dimensions, dimensions);
+	gsl_matrix_int *aprimeprime=gsl_matrix_int_alloc(dimensions, dimensions);
+
+	for(size_t i=0;i<dimensions;i++)
+	{
+		for(size_t j=0;j<dimensions;j++)
+		{
+			gsl_matrix_int_set(aT, i, j, gsl_matrix_int_get(a, j, i));
+			gsl_matrix_int_set(aprime, dimensions-j-1, dimensions-i-1, gsl_matrix_int_get(a, j, i));
+			gsl_matrix_int_set(aprimeprime, dimensions-i-1, dimensions-j-1, gsl_matrix_int_get(a, j, i));
+		}
+	}
 
 	if(gsl_matrix_int_compare(a,b)==0)
 		result=true;
 	else if(gsl_matrix_int_compare(aT,b)==0)
 		result=true;
+	else if(gsl_matrix_int_compare(aprime,b)==0)
+		result=true;
+	else if(gsl_matrix_int_compare(aprimeprime,b)==0)
+		result=true;
 
 	gsl_matrix_int_free(aT);
+	gsl_matrix_int_free(aprime);
+	gsl_matrix_int_free(aprimeprime);
 
 	return result;
 }
@@ -104,6 +127,7 @@ struct sampling_ctx_t
 	alps::alea::batch_acc<double> *overall_sign, *signs[MAX_ORDER];
 	alps::alea::batch_acc<double> *plus[MAX_ORDER], *minus[MAX_ORDER];
 	alps::alea::batch_acc<double> *orders[MAX_ORDER], **topologies[MAX_ORDER];
+	alps::alea::batch_acc<double> *excitations[MAX_EXCITATION_LEVEL];
 
 	long int nr_samples, nr_physical_samples, nr_samples_by_order[MAX_ORDER], nr_positive_samples[MAX_ORDER], nr_negative_samples[MAX_ORDER];
 
@@ -214,6 +238,9 @@ void init_topology_bins(struct sampling_ctx_t *sctx,int dimensions)
 
 	if(valid)
 		free(valid);
+
+	printf("Order %d, initialized %d bins.\n",dimensions,nextid);
+	fflush(stdout);
 }
 
 char *get_bin_description(struct sampling_ctx_t *sctx,int order,int id,char buf[256])
@@ -282,6 +309,11 @@ struct sampling_ctx_t *init_sampling_ctx(int maxdimensions)
 		ret->orders[c]=new alps::alea::batch_acc<double>;
 	}
 
+	for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
+	{
+		ret->excitations[c]=new alps::alea::batch_acc<double>;
+	}
+
 	ret->nr_samples=ret->nr_physical_samples=0;
 
 	for(int c=0;c<MAX_ORDER;c++)
@@ -303,6 +335,11 @@ void fini_sampling_ctx(struct sampling_ctx_t *sctx)
 			delete sctx->plus[c];
 			delete sctx->minus[c];
 			delete sctx->orders[c];
+		}
+
+		for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
+		{
+			delete sctx->excitations[c];
 		}
 
 		for(int dimensions=3;dimensions<=sctx->maxdimensions;dimensions++)
@@ -338,6 +375,7 @@ void sampling_ctx_measure(struct sampling_ctx_t *sctx,struct amatrix_t *amx,stru
 
 			int order=amx->pmxs[0]->dimensions;
 			int topology=amatrix_to_topology_index(amx,sctx);
+			int excitation_level=get_excitation_level(amx);
 
 			(*sctx->autocorrelation) << weight;
 			(*sctx->overall_sign) << sign;
@@ -354,6 +392,11 @@ void sampling_ctx_measure(struct sampling_ctx_t *sctx,struct amatrix_t *amx,stru
 					for(int d=0;d<sctx->nr_of_bins[c];d++)
 						(*sctx->topologies[c][d]) << (((c==order)&&(d==topology)) ? (sign) : (0.0));
 				}
+			}
+
+			for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
+			{
+					(*sctx->excitations[c])<<((((order==3)||(order==4))&&(c==excitation_level)) ? (sign):(0.0));
 			}
 
 			sctx->nr_samples_by_order[order]++;
@@ -400,11 +443,11 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 	alps::alea::batch_result<double> result_overall_sign, result_signs[MAX_ORDER];
 	alps::alea::batch_result<double> result_plus[MAX_ORDER], result_minus[MAX_ORDER];
 	alps::alea::batch_result<double> result_orders[MAX_ORDER], *result_topologies[MAX_ORDER];
+	alps::alea::batch_result<double> result_excitations[MAX_EXCITATION_LEVEL];
 
 	for(int c=0;c<MAX_ORDER;c++)
 	{
-		result_topologies[c]=(alps::alea::batch_result<double> *)(malloc(
-			sizeof(alps::alea::batch_result<double>)*sctx->nr_of_bins[c]));
+		result_topologies[c]=(alps::alea::batch_result<double> *)(malloc(sizeof(alps::alea::batch_result<double>)*sctx->nr_of_bins[c]));
 
 		for(int d=0;d<sctx->nr_of_bins[c];d++)
 			new(result_topologies[c]+d) alps::alea::batch_result<double>;
@@ -426,6 +469,9 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 		for(int c=0;c<MAX_ORDER;c++)
 			result_orders[c]=sctx->orders[c]->finalize();
 
+		for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
+			result_excitations[c]=sctx->excitations[c]->finalize();
+
 		for(int c=3;c<=sctx->maxdimensions;c++)
 			for(int d=0;d<sctx->nr_of_bins[c];d++)
 				result_topologies[c][d]=sctx->topologies[c][d]->finalize();
@@ -445,6 +491,9 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 
 		for(int c=0;c<MAX_ORDER;c++)
 			result_orders[c]=sctx->orders[c]->result();
+
+		for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
+			result_excitations[c]=sctx->excitations[c]->result();
 
 		for(int c=3;c<=sctx->maxdimensions;c++)
 			for(int d=0;d<sctx->nr_of_bins[c];d++)
@@ -566,6 +615,46 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 		fprintf(out, "MP%d(all)/MP2 %f +- %f (%f%%)\n", order, ratios, sigmaratios, 100.0f*sigmaratios/ratios);
 	}
 
+	fprintf(out, "# Results by excitation level:\n");
+
+	for(int order=4;order<=4;order++)
+	{
+		double ratios=0.0f, sigmaratios=0.0f;
+
+		fprintf(out, "# MP%d\n", order);
+
+		for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
+		{
+			double phi1, phi2, sigmaphi1, sigmaphi2;
+
+			if(gsl_fcmp(result_excitations[c].mean()(0),0.0f,1e-7)==0)
+				continue;
+
+			phi1=result_excitations[c].mean()(0);
+			phi2=result_orders[2].mean()(0);
+
+			sigmaphi1=result_excitations[c].stderror()(0);
+			sigmaphi2=result_orders[2].stderror()(0);
+
+			double ratio, sigmaratio;
+
+			ratio=phi1/phi2;
+			sigmaratio=ratio*sqrt(pow(sigmaphi1/phi1, 2.0f)+pow(sigmaphi2/phi2, 2.0f));
+
+			ratios+=ratio;
+			sigmaratios+=sigmaratio*sigmaratio;
+
+			fprintf(out, "MP4(%d-plets)/MP2 %f +- %f (%f%%)\n", c, ratio, sigmaratio, 100.0f*sigmaratio/ratio);
+		}
+
+		sigmaratios=sqrt(sigmaratios);
+
+		fprintf(out, "MP%d(all)/MP2 %f +- %f (%f%%)\n", order, ratios, sigmaratios, 100.0f*sigmaratios/ratios);
+	}
+
+	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
+	fflush(out);
+
 	for(int c=0;c<MAX_ORDER;c++)
 	{
 		if(result_topologies[c])
@@ -576,7 +665,4 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 			free(result_topologies[c]);
 		}
 	}
-
-	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
-	fflush(out);
 }
