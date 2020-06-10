@@ -76,6 +76,18 @@ int count_loops(struct label_t *labels, int *ilabels, int mels[MAX_MATRIX_ELEMEN
 	return loops;
 }
 
+double ftransform(struct amatrix_t *amx,double w)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	if(dimensions==2)
+		return fabs(w);
+
+	return fnegative_part(w);
+
+	//return w;
+}
+
 /*
 	This function calculates a diagram's weight given the incidence matrix
 */
@@ -292,7 +304,7 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 		we return it.
 	*/
 
-	return pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
+	return ftransform(amx,pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx));
 }
 
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels)

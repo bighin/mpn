@@ -315,7 +315,7 @@ double reconstruct_weight(struct amatrix_t *amx, struct weight_info_t *awt)
 
 	numerators*=awt->unphysical_penalty;
 
-	double weight=pow(awt->inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);
+	double weight=ftransform(amx,pow(awt->inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx));
 
 	/*
 		Lindelöf resummation should happen here, if needed.

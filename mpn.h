@@ -31,4 +31,6 @@ int count_loops(struct label_t *labels, int *ilabels, int mels[MAX_MATRIX_ELEMEN
 double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabels, struct amatrix_t *amx);
 gsl_matrix_int *amatrix_calculate_incidence(struct amatrix_t *amx, struct label_t labels[MAX_LABELS], int *ilabels);
 
+double ftransform(struct amatrix_t *amx,double w);
+
 #endif //__MPN_H__
