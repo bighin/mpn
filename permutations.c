@@ -3,8 +3,8 @@
 #include <gsl/gsl_rng.h>
 
 #include "permutations.h"
-#include "plist.h"
 #include "pmatrix.h"
+#include "auxx.h"
 
 /*
 	Given a N-permutation of number from 1 to N, returns its index in the lexicographic
@@ -91,6 +91,103 @@ void pmatrix_to_permutation(struct pmatrix_t *m,int *permutation)
 			}
 		}
 	}
+}
+
+int permutations2[2][2];
+int permutations3[6][3];
+int permutations4[24][4];
+int permutations5[120][5];
+int permutations6[720][6];
+int permutations7[5040][7];
+int permutations8[40320][8];
+int permutations9[362880][9];
+int permutations10[3628800][10];
+
+void init_permutation_table(int dimensions)
+{
+	int index,numbers[MAX_ORDER];
+
+	for(int c=0;c<MAX_ORDER;c++)
+		numbers[c]=1;
+
+	index=0;
+	while(numbers[dimensions]==1)
+	{
+		bool is_permutation=true;
+
+		for(int c=0;c<dimensions;c++)
+			for(int d=c+1;d<dimensions;d++)
+				if(numbers[c]==numbers[d])
+					is_permutation=false;
+
+		if(is_permutation)
+		{
+			for(int c=0;c<dimensions;c++)
+			{
+				switch(dimensions)
+				{
+					case 2:
+					permutations2[index][c]=numbers[dimensions-1-c];
+					break;
+
+					case 3:
+					permutations3[index][c]=numbers[dimensions-1-c];
+					break;
+
+					case 4:
+					permutations4[index][c]=numbers[dimensions-1-c];
+					break;
+
+					case 5:
+					permutations5[index][c]=numbers[dimensions-1-c];
+					break;
+
+					case 6:
+					permutations6[index][c]=numbers[dimensions-1-c];
+					break;
+
+					case 7:
+					permutations7[index][c]=numbers[dimensions-1-c];
+					break;
+
+					case 8:
+					permutations8[index][c]=numbers[dimensions-1-c];
+					break;
+
+					case 9:
+					permutations9[index][c]=numbers[dimensions-1-c];
+					break;
+
+					case 10:
+					permutations10[index][c]=numbers[dimensions-1-c];
+					break;
+
+					default:
+					break;
+				}
+			}
+
+			index++;
+		}
+
+		for(int c=0;c<MAX_ORDER;c++)
+		{
+			numbers[c]++;
+
+			if(numbers[c]==(dimensions+1))
+				numbers[c]=1;
+			else
+				break;
+		}
+	}
+
+	assert(index==ifactorial(dimensions));
+}
+
+void init_permutation_tables(int max_dimensions)
+{
+	for(int c=2;c<=max_dimensions;c++)
+		init_permutation_table(c);
 }
 
 /*

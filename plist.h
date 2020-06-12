@@ -857,3 +857,11 @@ int permutations6[720][6]=
 			   {6, 5, 4, 3, 1, 2},
 			   {6, 5, 4, 3, 2, 1}
 };
+
+int permutations7[5040][6];
+
+int permutations8[40320][6];
+
+int permutations9[362880][6];
+
+int permutations10[3628800][6];

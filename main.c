@@ -6,6 +6,7 @@
 #include "config.h"
 #include "cache.h"
 #include "mc.h"
+#include "permutations.h"
 
 void usage(char *argv0)
 {
@@ -29,8 +30,10 @@ int main(int argc,char *argv[])
 		{
 			printf("Diagrammatic Monte Carlo for Møller-Plesset theory.\n");
 
+			init_permutation_tables(8);
+
 			amatrix_cache_is_enabled=true;
-			init_cache(6);
+			init_cache(8);
 		}
 
 		load_config_defaults(&config);

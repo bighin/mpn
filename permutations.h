@@ -18,6 +18,12 @@ extern int permutations3[6][3];
 extern int permutations4[24][4];
 extern int permutations5[120][5];
 extern int permutations6[720][6];
+extern int permutations7[5040][7];
+extern int permutations8[40320][8];
+extern int permutations9[362880][9];
+extern int permutations10[3628800][10];
+
+void init_permutation_tables(int max_dimensions);
 
 void fisher_yates(gsl_rng *rng_ctx, int *array, int length);
 
