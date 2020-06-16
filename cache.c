@@ -147,14 +147,17 @@ void save_cache_to_file(int dimensions)
 		fclose(f);
 }
 
-void fill_cache(int dimensions,int expected_connected,int expected_not_connected)
+void fill_cache(int dimensions,long int expected_connected,long int expected_not_connected)
 {
+	assert(sizeof(long int)>=8);
+
 	if(load_cache_from_file(dimensions)==true)
 		return;
 
 	struct amatrix_t *amx=init_amatrix(NULL);
 
-	int connected,not_connected,nr_permutations;
+	int nr_permutations;
+	long int connected,not_connected;
 
 	amx->pmxs[0]->dimensions=amx->pmxs[1]->dimensions=dimensions;
 
@@ -163,12 +166,6 @@ void fill_cache(int dimensions,int expected_connected,int expected_not_connected
 
 	for(int i=0;i<nr_permutations;i++)
 	{
-
-#warning DELME
-
-		printf("%d/%d\n",i,nr_permutations);
-		fflush(stdout);
-
 		for(int j=0;j<nr_permutations;j++)
 		{
 			gsl_matrix_int *a,*b;
@@ -310,16 +307,8 @@ bool init_cache(int max_dimensions)
 	if(max_dimensions>=6) fill_cache(6,413640,104760);
 	if(max_dimensions>=7) fill_cache(7,20946960,4454640);
 	if(max_dimensions>=8) fill_cache(8,1377648720,248053680);
-
-	/*
-		For the next two to work, we need to change expect_connect and expected_not_connected
-		to 64-bit integers.
-	*/
-
-	assert(max_dimensions<=8);
-
-	//if(max_dimensions>=9) fill_cache(9,114078384000,17603510400);
-	//if(max_dimensions>=10) fill_cache(10,114078384000,13054111056000);
+	if(max_dimensions>=9) fill_cache(9,114078384000,17603510400);
+	if(max_dimensions>=10) fill_cache(10,11611761920640,1556427519360);
 
 	return true;
 }

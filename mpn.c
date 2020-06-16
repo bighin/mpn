@@ -78,14 +78,7 @@ int count_loops(struct label_t *labels, int *ilabels, int mels[MAX_MATRIX_ELEMEN
 
 double ftransform(struct amatrix_t *amx,double w)
 {
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	if(dimensions==2)
-		return fabs(w);
-
-	return fnegative_part(w);
-
-	//return w;
+	return w;
 }
 
 /*
