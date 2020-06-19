@@ -186,19 +186,19 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	/*
-		We select which one of the permutation matrices we want to play with
-	*/
-
-	struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
-
-	/*
-		We select the row the element we want to modify lies in. Since there's one
-		and only one element per row, we do not need to select a column.
-	*/
-
-	for(int repeats=0;repeats<1;repeats++)
+	for(int repeats=0;repeats<5;repeats++)
 	{
+		/*
+			We select which one of the permutation matrices we want to play with
+		*/
+
+		struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
+
+		/*
+			We select the row the element we want to modify lies in. Since there's one
+			and only one element per row, we do not need to select a column.
+		*/
+
 		int i=gsl_rng_uniform_int(amx->rng_ctx, dimensions);
 
 		for(int j=0;j<dimensions;j++)
@@ -462,7 +462,15 @@ int do_diagmc(struct configuration_t *config)
 	assert(config->maxorder<MAX_ORDER);
 
 	while(amx->pmxs[0]->dimensions<config->minorder)
-		update_extend(amx,true);
+	{
+		struct amatrix_backup_t backup;
+
+		amatrix_save(amx,&backup);
+		update_extend(amx, true);
+
+		if(amatrix_check_connectedness(amx)==false)
+			amatrix_restore(amx, &backup);
+	}
 
 	/*
 		We setup a signal handler to gracefully handle a CTRL-C (i.e. SIGINT),
@@ -534,6 +542,8 @@ int do_diagmc(struct configuration_t *config)
 			default:
 			assert(false);
 		}
+
+		printf("%c\n",(amatrix_is_physical(amx)==true)?('P'):('U'));
 
 		sampling_ctx_measure(sctx,amx,config,counter);
 
