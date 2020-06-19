@@ -543,8 +543,6 @@ int do_diagmc(struct configuration_t *config)
 			assert(false);
 		}
 
-		printf("%c\n",(amatrix_is_physical(amx)==true)?('P'):('U'));
-
 		sampling_ctx_measure(sctx,amx,config,counter);
 
 		if((counter%262144)==0)

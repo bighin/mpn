@@ -430,8 +430,10 @@ void order_description(char *buf,int length,int order)
 
 void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx,FILE *out,bool finalize)
 {
-	fprintf(out,
-		"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Positive fraction> <Negative fraction> <Sign (from ALEA)>\n");
+	if(finalize==false)
+		fprintf(out,"# Iterations in the physical sector: %f%%\n",sampling_ctx_get_physical_pct(sctx));
+
+	fprintf(out,"# <Order> <Positive physical samples> <Negative physical samples> <Percentage> <Sign> <Positive fraction> <Negative fraction> <Sign (from ALEA)>\n");
 
 	alps::alea::autocorr_result<double> result_autocorrelation;
 
