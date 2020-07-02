@@ -190,6 +190,49 @@ void init_permutation_tables(int max_dimensions)
 		init_permutation_table(c);
 }
 
+int get_permutation(int dimensions,int pindex,int element)
+{
+	assert((dimensions>=2)&&(dimensions<=10));
+	assert((pindex>=0)&&(pindex<ifactorial(dimensions)));
+	assert((element>=0)&&(element<dimensions));
+
+	switch(dimensions)
+	{
+		case 2:
+		return permutations2[pindex][element];
+
+		case 3:
+		return permutations3[pindex][element];
+
+		case 4:
+		return permutations4[pindex][element];
+
+		case 5:
+		return permutations5[pindex][element];
+
+		case 6:
+		return permutations6[pindex][element];
+
+		case 7:
+		return permutations7[pindex][element];
+
+		case 8:
+		return permutations8[pindex][element];
+
+		case 9:
+		return permutations9[pindex][element];
+
+		case 10:
+		return permutations10[pindex][element];
+
+		default:
+		break;
+	}
+
+	assert(false);
+	return 0;
+}
+
 /*
 	The Fisher-Yates algorithm generates a random permutation
 */

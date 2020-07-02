@@ -24,6 +24,7 @@ extern int permutations9[362880][9];
 extern int permutations10[3628800][10];
 
 void init_permutation_tables(int max_dimensions);
+int get_permutation(int dimensions,int pindex,int element);
 
 void fisher_yates(gsl_rng *rng_ctx, int *array, int length);
 

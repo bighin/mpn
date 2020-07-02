@@ -221,7 +221,7 @@ char get_nth_character(char *s,size_t n)
 	Print a file size using the appropriate units.
 */
 
-void print_file_size(FILE *out,int size)
+void print_file_size(FILE *out,double size)
 {
 	char *symbols[]={"B","KiB","MiB","GiB","TiB","PiB"};
 
@@ -229,14 +229,14 @@ void print_file_size(FILE *out,int size)
 	{
 		if(size<1024)
 		{
-			fprintf(out,"%d %s", size, symbols[c]);
+			fprintf(out,"%.2f %s", size, symbols[c]);
 			return;
 		}
 
 		size/=1024;
 	}
 
-	fprintf(out,"%d %s", size, "EiB");
+	fprintf(out,"%.2f %s", size, "EiB");
 }
 
 /*

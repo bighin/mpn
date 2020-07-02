@@ -318,6 +318,123 @@ int update_swap(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
+int update_flip1(struct amatrix_t *amx, bool always_accept)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
+	assert(amx->pmxs[0]->dimensions>=1);
+
+	double weightratio=1.0f/fabs(amatrix_weight(amx));
+
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
+
+	int selector=gsl_rng_uniform_int(amx->rng_ctx, 3);
+
+	for(size_t i=0;i<dimensions;i++)
+	{
+		for(size_t j=0;j<dimensions;j++)
+		{
+			switch(selector)
+			{
+				case 0:
+				amx->pmxs[0]->values[i][j]=backup.values[0][j][i];
+				amx->pmxs[1]->values[i][j]=backup.values[1][j][i];
+				break;
+
+				case 1:
+				amx->pmxs[0]->values[dimensions-j-1][dimensions-i-1]=backup.values[0][j][i];
+				amx->pmxs[1]->values[dimensions-j-1][dimensions-i-1]=backup.values[1][j][i];
+				break;
+
+				case 2:
+				amx->pmxs[0]->values[dimensions-i-1][dimensions-j-1]=backup.values[0][j][i];
+				amx->pmxs[1]->values[dimensions-i-1][dimensions-j-1]=backup.values[1][j][i];
+				break;
+
+				default:
+				break;
+			}
+		}
+	}
+
+	amx->cached_weight_is_valid=false;
+
+	/*
+		The update is balanced with itself, the acceptance ratio is simply given
+		by the (modulus of the) weights ratio.
+	*/
+
+	double acceptance_ratio;
+
+	weightratio*=fabs(amatrix_weight(amx));
+	acceptance_ratio=weightratio;
+
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+
+	if((is_accepted==false)&&(always_accept==false))
+	{
+		amatrix_restore(amx, &backup);
+		return UPDATE_REJECTED;
+	}
+
+	return UPDATE_ACCEPTED;
+}
+
+int update_flip2(struct amatrix_t *amx, bool always_accept)
+{
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	if(dimensions==1)
+		return UPDATE_UNPHYSICAL;
+
+	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
+	assert(amx->pmxs[0]->dimensions>=1);
+
+	double weightratio=1.0f/fabs(amatrix_weight(amx));
+
+	struct amatrix_backup_t backup;
+	amatrix_save(amx, &backup);
+
+	int selectori=gsl_rng_uniform_int(amx->rng_ctx, ifactorial(dimensions));
+	int selectorj=gsl_rng_uniform_int(amx->rng_ctx, ifactorial(dimensions));
+
+	for(size_t i=0;i<dimensions;i++)
+	{
+		for(size_t j=0;j<dimensions;j++)
+		{
+			int iprime=get_permutation(dimensions,selectori,i)-1;
+			int jprime=get_permutation(dimensions,selectori,j)-1;
+
+			amx->pmxs[0]->values[iprime][jprime]=backup.values[0][i][j];
+			amx->pmxs[1]->values[iprime][jprime]=backup.values[1][i][j];
+		}
+	}
+
+	amx->cached_weight_is_valid=false;
+
+	/*
+		The update is balanced with itself, the acceptance ratio is simply given
+		by the (modulus of the) weights ratio.
+	*/
+
+	double acceptance_ratio;
+
+	weightratio*=fabs(amatrix_weight(amx));
+	acceptance_ratio=weightratio;
+
+	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
+
+	if((is_accepted==false)&&(always_accept==false))
+	{
+		amatrix_restore(amx, &backup);
+		return UPDATE_REJECTED;
+	}
+
+	return UPDATE_ACCEPTED;
+}
+
 /*
 	Auxiliary functions
 */
@@ -355,6 +472,10 @@ static void signal_handler(int signo)
 		print_summary=1;
 		break;
 
+		case SIGUSR2:
+		print_summary=2;
+		break;
+
 		default:
 		break;
 	}
@@ -367,7 +488,7 @@ static void signal_handler(int signo)
 int do_diagmc(struct configuration_t *config)
 {
 
-#define DIAGRAM_NR_UPDATES        (5)
+#define DIAGRAM_NR_UPDATES        (7)
 
 	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx, bool always_accept);
 	const char *update_names[DIAGRAM_NR_UPDATES];
@@ -384,12 +505,16 @@ int do_diagmc(struct configuration_t *config)
 	updates[2]=update_shuffle;
 	updates[3]=update_modify;
 	updates[4]=update_swap;
+	updates[5]=update_flip1;
+	updates[6]=update_flip2;
 
 	update_names[0]="Extend";
 	update_names[1]="Squeeze";
 	update_names[2]="Shuffle";
 	update_names[3]="Modify";
 	update_names[4]="Swap";
+	update_names[5]="Flip1";
+	update_names[6]="Flip2";
 
 	/*
 		Update probabilities: note that they must be the same for complementary update pairs,
@@ -401,6 +526,8 @@ int do_diagmc(struct configuration_t *config)
 	update_probability[2]=1;
 	update_probability[3]=1;
 	update_probability[4]=1;
+	update_probability[5]=0;
+	update_probability[6]=0;
 
 	assert(update_probability[0]==update_probability[1]);
 
@@ -482,6 +609,7 @@ int do_diagmc(struct configuration_t *config)
 
 	signal(SIGINT,signal_handler);
 	signal(SIGUSR1,signal_handler);
+	signal(SIGUSR2,signal_handler);
 
 	/*
 		We initialize the progress bar
@@ -565,6 +693,33 @@ int do_diagmc(struct configuration_t *config)
 			if(print_summary==1)
 			{
 				sampling_ctx_print_report(sctx,amx,stdout,false);
+				print_summary=0;
+			}
+
+			if(print_summary==2)
+			{
+				fprintf(stdout,"# Iterations in the physical sector: %f%%\n",sampling_ctx_get_physical_pct(sctx));
+
+				long int total_proposed,total_accepted,total_rejected;
+				total_proposed=total_accepted=total_rejected=0;
+
+				fprintf(stdout,"# Update statistics:\n");
+
+				for(int d=0;d<DIAGRAM_NR_UPDATES;d++)
+				{
+					fprintf(stdout,"# Update #%d (%s): ",d,update_names[d]);
+					show_update_statistics(stdout,proposed[d],accepted[d],rejected[d]);
+
+					total_proposed+=proposed[d];
+					total_accepted+=accepted[d];
+					total_rejected+=rejected[d];
+				}
+
+				fprintf(stdout,"# Total: ");
+				show_update_statistics(stdout,total_proposed,total_accepted,total_rejected);
+				fprintf(stdout,"#\n");
+				fflush(stdout);
+
 				print_summary=0;
 			}
 		}

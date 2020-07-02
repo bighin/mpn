@@ -114,7 +114,7 @@ bool load_cache_from_file(int dimensions)
 		if(f)
 			fclose(f);
 
-		printf("FAIL (%lu != %lu)!\n",size,size_read);
+		printf("FAIL (%llu != %llu)!\n",size,size_read);
 		fflush(stdout);
 
 		return false;
@@ -294,7 +294,7 @@ bool init_cache(int max_dimensions)
 		Now we just fill the caches.
 
 		The number of expected connected diagrams has been verified with Mathematica up
-		to order 6, and then it seems to follow EOIS sequence A122949.
+		to order 6, and then it seems to follow OEIS sequence A122949.
 
 		On the other hand, the number of expected non connected diagrams is simply
 		given by (dimensions!)^2 - expected_connected

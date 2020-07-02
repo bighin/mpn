@@ -115,3 +115,10 @@ print("MP2/MP3: ",order2/order3)
 print("MP3/MP4: ",order3/order4)
 print("MP4/MP5: ",order4/order5)
 print("MP5/MP6: ",order5/order6)
+
+print("")
+print("MP2/MP3: ",order2/order3)
+print("MP2/MP4: ",order2/order4)
+print("MP2/MP5: ",order2/order5)
+print("MP2/MP6: ",order2/order6)
+

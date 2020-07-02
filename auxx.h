@@ -27,7 +27,7 @@ double fnegative_part(double x);
 
 char get_nth_character(char *s,size_t n);
 
-void print_file_size(FILE *out,int size);
+void print_file_size(FILE *out,double size);
 
 char *find_and_replace(const char *src,const char *from,const char *to);
 
