@@ -54,6 +54,12 @@ struct amatrix_t *init_amatrix(struct configuration_t *config)
 	ret->pmxs[0]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);
 	ret->pmxs[1]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);
 
+	for(int i=0;i<PMATRIX_MAX_DIMENSIONS;i++)
+		ret->taus[i]=0.0f;
+
+	ret->taus[0]=config->maxtau/100.0f;
+	ret->taus[1]=2.0f*config->maxtau/100.0f;
+
 	ret->config=config;
 
 	ret->cached_weight=0.0f;
@@ -119,6 +125,8 @@ void amatrix_save(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 			backup->values[0][i][j]=amx->pmxs[0]->values[i][j];
 			backup->values[1][i][j]=amx->pmxs[1]->values[i][j];
 		}
+
+		backup->taus[i]=amx->taus[i];
 	}
 
 	backup->cached_result=amx->cached_weight;
@@ -140,6 +148,8 @@ void amatrix_restore(struct amatrix_t *amx, struct amatrix_backup_t *backup)
 			amx->pmxs[0]->values[i][j]=backup->values[0][i][j];
 			amx->pmxs[1]->values[i][j]=backup->values[1][i][j];
 		}
+
+		amx->taus[i]=backup->taus[i];
 	}
 
 	amx->cached_weight=backup->cached_result;
@@ -157,6 +167,10 @@ bool amatrix_check_consistency(struct amatrix_t *amx)
 
 	if(amx->pmxs[0]->dimensions!=amx->pmxs[1]->dimensions)
 		return false;
+
+	for(int c=1;c<amx->pmxs[0]->dimensions;c++)
+		if(!(amx->taus[c]>amx->taus[c-1]))
+			return false;
 
 	return pmatrix_check_consistency(amx->pmxs[0])&&pmatrix_check_consistency(amx->pmxs[1]);
 }

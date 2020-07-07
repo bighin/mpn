@@ -9,7 +9,7 @@
 
 struct sampling_ctx_t;
 
-struct sampling_ctx_t *init_sampling_ctx(int maxdimensions);
+struct sampling_ctx_t *init_sampling_ctx(struct configuration_t *config,int maxdimensions);
 void fini_sampling_ctx(struct sampling_ctx_t *sctx);
 
 void sampling_ctx_measure(struct sampling_ctx_t *sctx,struct amatrix_t *amx,struct configuration_t *config,long int counter);

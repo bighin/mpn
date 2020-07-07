@@ -25,6 +25,8 @@ double fnegative_part(double x);
 #define MIN(x,y)	(((x)<(y))?(x):(y))
 #define MAX(x,y)	(((x)>(y))?(x):(y))
 
+double fsign(double x);
+
 char get_nth_character(char *s,size_t n);
 
 void print_file_size(FILE *out,double size);

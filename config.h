@@ -17,6 +17,8 @@ struct configuration_t
 	double unphysicalpenalty;
 	int minorder,maxorder;
 	double epsilon;
+	double maxtau;
+	double chempot;
 
 	/* "sampling" section */
 
@@ -24,6 +26,8 @@ struct configuration_t
 	long int thermalization;
 	double timelimit;
 	int decorrelation;
+	int nrbins;
+	double binwidth;
 
 	/* The name of the file the configuration has been loaded from */
 

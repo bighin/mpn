@@ -158,13 +158,18 @@ struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t 
 			}
 		}
 
-		if(energies_in_denominator>0)
-		{
-			denominators*=denominator;
-			ret.nr_denominators++;
+		double deltatau=amx->taus[i+1]-amx->taus[i];
 
-			excitation_level=MAX(excitation_level,energies_in_denominator/2);
-		}
+		if(energies_in_denominator>0)
+			denominators/=fsign(denominator)*exp(-deltatau*fabs(denominator));
+		else
+			denominators/=exp(-deltatau);
+
+		ret.denominators[ret.nr_denominators].deltatau=deltatau;
+		ret.nr_denominators++;
+
+		excitation_level=MAX(excitation_level,energies_in_denominator/2);
+
 	}
 
 	ret.excitation_level=excitation_level;
@@ -289,7 +294,10 @@ double reconstruct_weight(struct amatrix_t *amx, struct weight_info_t *awt)
 			}
 		}
 
-		denominators*=denominator;
+		if(awt->denominators[c].ilabels>0)
+			denominators/=fsign(denominator)*exp(-awt->denominators[c].deltatau*fabs(denominator));
+		else
+			denominators/=exp(-awt->denominators[c].deltatau);
 	}
 
 	double numerators=1.0f;

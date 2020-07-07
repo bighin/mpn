@@ -22,6 +22,7 @@ extern "C" {
 #include "sampling.h"
 #include "auxx.h"
 #include "limits.h"
+#include "histograms.h"
 
 #ifdef __cplusplus
 }
@@ -133,6 +134,8 @@ struct sampling_ctx_t
 
 	int *bin_mappings[MAX_ORDER];
 	int nr_of_bins[MAX_ORDER];
+
+	struct super_sampler_t *sst;
 
 	int maxdimensions;
 };
@@ -278,7 +281,7 @@ int amatrix_to_topology_index(struct amatrix_t *amx,struct sampling_ctx_t *sctx)
 	return 0;
 }
 
-struct sampling_ctx_t *init_sampling_ctx(int maxdimensions)
+struct sampling_ctx_t *init_sampling_ctx(struct configuration_t *config,int maxdimensions)
 {
 	struct sampling_ctx_t *ret=(struct sampling_ctx_t *)(malloc(sizeof(struct sampling_ctx_t)));
 
@@ -318,6 +321,12 @@ struct sampling_ctx_t *init_sampling_ctx(int maxdimensions)
 
 	for(int c=0;c<MAX_ORDER;c++)
 		ret->nr_samples_by_order[c]=ret->nr_positive_samples[c]=ret->nr_negative_samples[c]=0;
+
+#define NR_BLOCKSIZES	(5)
+
+	int blocksizes[NR_BLOCKSIZES]={500,1000,10000,25000,50000};
+
+	ret->sst=init_super_sampler(blocksizes,NR_BLOCKSIZES,config->nrbins,config->binwidth);
 
 	return ret;
 }
@@ -380,6 +389,8 @@ void sampling_ctx_measure(struct sampling_ctx_t *sctx,struct amatrix_t *amx,stru
 			(*sctx->autocorrelation) << weight;
 			(*sctx->overall_sign) << sign;
 			(*sctx->signs[order]) << sign;
+
+			super_sampler_add_time_sample(sctx->sst,amx->taus[order-1],sign);
 
 			for(int c=0;c<=sctx->maxdimensions;c++)
 			{
@@ -664,4 +675,32 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 			free(result_topologies[c]);
 		}
 	}
+
+	for(int d=0;d<amx->config->nrbins;d++)
+	{
+		double lower,upper,bincenter;
+
+		block_histogram_get_range(sctx->sst->bhs[0],d,&lower,&upper);
+		bincenter=(lower+upper)/2.0f;
+
+		fprintf(out,"%f ",bincenter);
+
+		for(int k=0;k<NR_BLOCKSIZES;k++)
+		{
+			double mean=block_histogram_get_mean(sctx->sst->bhs[k],d);
+			double sigma=sqrtf(block_histogram_get_variance(sctx->sst->bhs[k],d));
+
+			/*
+				TODO: no normalization as of now.
+			*/
+
+			fprintf(out,"%f %f ",mean,sigma);
+		}
+
+		fprintf(out,"\n");
+	}
+
+	if(finalize==true)
+		fini_super_sampler(sctx->sst);
+
 }

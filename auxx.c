@@ -205,6 +205,11 @@ double fnegative_part(double x)
 	return (x<0.0f)?(-x):(0.0f);
 }
 
+double fsign(double x)
+{
+	return (x>0.0f)?(1.0f):(-1.0f);
+}
+
 /*
 	Returns the n-th character of the string s if it is long enough, otherwise an underscore.
 */

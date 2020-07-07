@@ -26,6 +26,7 @@ struct weight_info_t
 		int labels[MAX_LABELS];
 		int qtypes[MAX_LABELS];
 		int ilabels;
+		double deltatau;
 	}
 	denominators[MAX_DENOMINATORS];
 	int nr_denominators;

@@ -29,6 +29,14 @@ struct amatrix_t *init_amatrix_from_amatrix(struct amatrix_t *amx)
 	ret->pmxs[0]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);
 	ret->pmxs[1]=init_pmatrix(ret->nr_occupied, ret->nr_virtual, ret->rng_ctx);
 
+	for(int i=0;i<PMATRIX_MAX_DIMENSIONS;i++)
+		ret->taus[i]=0.0f;
+
+	double maxtau=amx->config->maxtau;
+
+	ret->taus[0]=maxtau/100.0f;
+	ret->taus[1]=2.0f*maxtau/100.0f;
+
 	ret->config=amx->config;
 
 	assert(ret->config!=NULL);
@@ -134,6 +142,8 @@ void collection_add_copy(struct amatrix_collection_t *acl, struct amatrix_t *amx
 			copy->pmxs[0]->values[i][j]=amx->pmxs[0]->values[i][j];
 			copy->pmxs[1]->values[i][j]=amx->pmxs[1]->values[i][j];
 		}
+
+		copy->taus[i]=amx->taus[i];
 	}
 
 	collection_add(acl, copy, winfo);
@@ -510,7 +520,15 @@ double amatrix_projection_multiplicity(struct amatrix_t *amx)
 		}
 	}
 
-	return pow(amx->nr_virtual,nr_occupied_entries)*pow(amx->nr_occupied,nr_virtual_entries);
+	int dimensions=amx->pmxs[0]->dimensions;
+
+	double result;
+
+	result=ifactorial(dimensions);
+	result*=pow(amx->nr_virtual,nr_occupied_entries)*pow(amx->nr_occupied,nr_virtual_entries);
+	result/=exp(amx->config->chempot*amx->taus[dimensions-1]);
+
+	return result;
 }
 
 /*

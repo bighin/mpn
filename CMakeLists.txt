@@ -35,7 +35,7 @@ set(ALPS_FORCE_NO_COMPILER_CHECK "1")
 find_package(ALPSCore REQUIRED)
 include_directories(${ALPSCore_INCLUDE_DIR})
 
-add_executable(mpn mpn.c mpn.h amatrix.c amatrix.h auxx.c auxx.h pmatrix.c pmatrix.h loaderis.c loaderis.h mc.c mc.h libprogressbar/progressbar.c libprogressbar/progressbar.h inih/ini.c inih/ini.h main.c config.c config.h multiplicity.c multiplicity.h cache.c cache.h permutations.c permutations.h weight.c weight.h weight2.c weight2.h sampling.cpp sampling.h)
+add_executable(mpn mpn.c mpn.h amatrix.c amatrix.h auxx.c auxx.h pmatrix.c pmatrix.h loaderis.c loaderis.h mc.c mc.h libprogressbar/progressbar.c libprogressbar/progressbar.h inih/ini.c inih/ini.h main.c config.c config.h multiplicity.c multiplicity.h cache.c cache.h permutations.c permutations.h weight.c weight.h weight2.c weight2.h sampling.cpp sampling.h histograms.c histograms.h)
 
 target_link_libraries(mpn ${GSL_LIBRARIES})
 target_link_libraries(mpn ${CURSES_LIBRARIES})

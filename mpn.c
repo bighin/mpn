@@ -212,8 +212,12 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 			}
 		}
 
+		double deltatau=amx->taus[i+1]-amx->taus[i];
+
 		if(energies_in_denominator>0)
-			denominators*=denominator;
+			denominators/=fsign(denominator)*exp(-deltatau*fabs(denominator));
+		else
+			denominators/=exp(-deltatau);
 
 		if(verbose==true)
 			printf("}\n");
