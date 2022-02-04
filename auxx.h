@@ -25,8 +25,6 @@ double fnegative_part(double x);
 #define MIN(x,y)	(((x)<(y))?(x):(y))
 #define MAX(x,y)	(((x)>(y))?(x):(y))
 
-double fsign(double x);
-
 char get_nth_character(char *s,size_t n);
 
 void print_file_size(FILE *out,double size);
@@ -37,5 +35,7 @@ void normalize_distribution(double *dists, int nrstates);
 void to_cumulative_distribution(const double *dists, double *cdists, int nrstates);
 int cdist_search(const double *cdists, int lo, int hi, double selector);
 int cdist_linear_search(const double *cdists, int lo, int hi, double selector);
+
+void remove_char(char *s,char c);
 
 #endif //__AUXX_H__

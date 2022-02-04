@@ -21,7 +21,3 @@
 #ifndef MAX_NUMERATORS
 #define MAX_NUMERATORS		(16)
 #endif
-
-#ifndef MAX_EXCITATION_LEVEL
-#define MAX_EXCITATION_LEVEL 	(16)
-#endif

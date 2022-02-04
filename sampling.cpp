@@ -22,7 +22,6 @@ extern "C" {
 #include "sampling.h"
 #include "auxx.h"
 #include "limits.h"
-#include "histograms.h"
 
 #ifdef __cplusplus
 }
@@ -81,221 +80,26 @@ int *get_permutation_array(int order,int c)
 	return NULL;
 }
 
-bool matrices_in_same_bin(gsl_matrix_int *a,gsl_matrix_int *b)
-{
-	bool result=false;
-
-	assert(a->size1==a->size2);
-	assert(b->size1==b->size2);
-	assert(a->size1==b->size1);
-
-	size_t dimensions=a->size1;
-
-	gsl_matrix_int *aT=gsl_matrix_int_alloc(dimensions,dimensions);
-	gsl_matrix_int *aprime=gsl_matrix_int_alloc(dimensions, dimensions);
-	gsl_matrix_int *aprimeprime=gsl_matrix_int_alloc(dimensions, dimensions);
-
-	for(size_t i=0;i<dimensions;i++)
-	{
-		for(size_t j=0;j<dimensions;j++)
-		{
-			gsl_matrix_int_set(aT, i, j, gsl_matrix_int_get(a, j, i));
-			gsl_matrix_int_set(aprime, dimensions-j-1, dimensions-i-1, gsl_matrix_int_get(a, j, i));
-			gsl_matrix_int_set(aprimeprime, dimensions-i-1, dimensions-j-1, gsl_matrix_int_get(a, j, i));
-		}
-	}
-
-	if(gsl_matrix_int_compare(a,b)==0)
-		result=true;
-	else if(gsl_matrix_int_compare(aT,b)==0)
-		result=true;
-	else if(gsl_matrix_int_compare(aprime,b)==0)
-		result=true;
-	else if(gsl_matrix_int_compare(aprimeprime,b)==0)
-		result=true;
-
-	gsl_matrix_int_free(aT);
-	gsl_matrix_int_free(aprime);
-	gsl_matrix_int_free(aprimeprime);
-
-	return result;
-}
-
 struct sampling_ctx_t
 {
 	alps::alea::autocorr_acc<double> *autocorrelation;
 
 	alps::alea::batch_acc<double> *overall_sign, *signs[MAX_ORDER];
 	alps::alea::batch_acc<double> *plus[MAX_ORDER], *minus[MAX_ORDER];
-	alps::alea::batch_acc<double> *orders[MAX_ORDER], **topologies[MAX_ORDER];
-	alps::alea::batch_acc<double> *excitations[MAX_EXCITATION_LEVEL];
+	alps::alea::batch_acc<double> *orders[MAX_ORDER];
 
 	long int nr_samples, nr_physical_samples, nr_samples_by_order[MAX_ORDER], nr_positive_samples[MAX_ORDER], nr_negative_samples[MAX_ORDER];
-
-	int *bin_mappings[MAX_ORDER];
-	int nr_of_bins[MAX_ORDER];
-
-	struct super_sampler_t *sst;
 
 	int maxdimensions;
 };
 
-/*
-	Each diagram topology can be identified by an identifier, as returned by amatrix_to_index().
-
-	However, these identifiers are not unique: two different id's can correspond to
-	the same adjacency matrix, due to multiplicity considerations. Also the identifiers
-	are sequential when taking into account adjacency matrices corresponding to unconnected
-	graphs; once these are removed the identifiers are sparse.
-
-	Here we establish a lookup table -- order by order -- between the index returned
-	by amatrix_to_index() and a different index which has these properties:
-
-	1) It only labels connected, physical matrices, and it is sequential.
-	Matrices representing unconnected graphs are not assigned an index.
-
-	2) Adjacency matrices connected by simple transformations (conjugation, transposition)
-	are assigned the same indices.
-
-	This new index will then used to label bins -- again, order by order -- for sampling.
-*/
-
-void init_topology_bins(struct sampling_ctx_t *sctx,int dimensions)
-{
-	gsl_matrix_int **mxs=(gsl_matrix_int **)(malloc(sizeof(gsl_matrix_int *)*ifactorial(dimensions)*ifactorial(dimensions)));
-
-	int *bin_mapping=(int *)(malloc(sizeof(int)*ifactorial(dimensions)*ifactorial(dimensions)));
-	bool *valid=(bool *)(malloc(sizeof(bool)*ifactorial(dimensions)*ifactorial(dimensions)));
-
-	for(int i=0;i<ifactorial(dimensions)*ifactorial(dimensions);i++)
-		mxs[i]=gsl_matrix_int_alloc(dimensions,dimensions);
-
-	for(int d=0;d<ifactorial(dimensions);d++)
-	{
-		for(int c=0;c<ifactorial(dimensions);c++)
-		{
-			int index=ifactorial(dimensions)*d+c;
-
-			valid[index]=true;
-
-			gsl_matrix_int *m=permutation_to_matrix(get_permutation_array(dimensions,c),dimensions);
-			gsl_matrix_int *n=permutation_to_matrix(get_permutation_array(dimensions,d),dimensions);
-
-			gsl_matrix_int_add(m,n);
-			gsl_matrix_int_memcpy(mxs[index],m);
-
-			bool is_unphysical=false;
-
-			for(int l=0;l<dimensions;l++)
-				if(gsl_matrix_int_get(mxs[index],l,l)!=0)
-					is_unphysical=true;
-
-			if((is_unphysical)||(gsl_matrix_int_check_connectedness(mxs[index],dimensions)==false))
-			{
-				bin_mapping[index]=-1;
-				valid[index]=false;
-			}
-
-			gsl_matrix_int_free(m);
-			gsl_matrix_int_free(n);
-		}
-	}
-
-	int nextid=0;
-
-	for(int i=0;i<ifactorial(dimensions)*ifactorial(dimensions);i++)
-	{
-		if(valid[i]==false)
-			continue;
-
-		bin_mapping[i]=nextid;
-		valid[i]=false;
-
-		for(int j=i+1;j<ifactorial(dimensions)*ifactorial(dimensions);j++)
-		{
-			if((valid[j]==true)&&(matrices_in_same_bin(mxs[i],mxs[j])==true))
-			{
-				bin_mapping[j]=nextid;
-				valid[j]=false;
-			}
-		}
-
-		nextid++;
-	}
-
-	for(int i=0;i<ifactorial(dimensions)*ifactorial(dimensions);i++)
-		gsl_matrix_int_free(mxs[i]);
-
-	sctx->nr_of_bins[dimensions]=nextid;
-
-	/*
-		Finally we initialize the bin accumulators
-	*/
-
-	sctx->topologies[dimensions]=(alps::alea::batch_acc<double> **)(malloc(sizeof(alps::alea::batch_acc<double> *)*sctx->nr_of_bins[dimensions]));
-
-	for(int c=0;c<sctx->nr_of_bins[dimensions];c++)
-		sctx->topologies[dimensions][c]=new alps::alea::batch_acc<double>;
-
-	sctx->bin_mappings[dimensions]=bin_mapping;
-
-	if(valid)
-		free(valid);
-
-	printf("Order %d, initialized %d bins.\n",dimensions,nextid);
-	fflush(stdout);
-}
-
-char *get_bin_description(struct sampling_ctx_t *sctx,int order,int id,char buf[256])
-{
-	bool first=true;
-
-	buf[0]='\0';
-
-	for(int i=0;i<ifactorial(order)*ifactorial(order);i++)
-	{
-		if(sctx->bin_mappings[order][i]==id)
-		{
-			char tmp[256];
-
-			if(first)
-				snprintf(tmp, 256, "%d",i);
-			else
-				snprintf(tmp, 256, "%s,%d",buf,i);
-
-			strncpy(buf,tmp,256);
-			first=false;
-		}
-	}
-
-	return buf;
-}
-
-int amatrix_to_topology_index(struct amatrix_t *amx,struct sampling_ctx_t *sctx)
-{
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	if(dimensions>=3)
-		return sctx->bin_mappings[dimensions][amatrix_to_index(amx)];
-
-	return 0;
-}
-
-struct sampling_ctx_t *init_sampling_ctx(struct configuration_t *config,int maxdimensions)
+struct sampling_ctx_t *init_sampling_ctx(int maxdimensions)
 {
 	struct sampling_ctx_t *ret=(struct sampling_ctx_t *)(malloc(sizeof(struct sampling_ctx_t)));
 
 	assert(ret!=NULL);
 
 	ret->maxdimensions=maxdimensions;
-
-	for(int dimensions=0;dimensions<MAX_ORDER;dimensions++)
-	{
-		ret->nr_of_bins[dimensions]=0;
-
-		if((dimensions>=3)&&(dimensions<=maxdimensions))
-			init_topology_bins(ret, dimensions);
-	}
 
 	/*
 		We initialize the accumulators and variables we will use for performing measurements.
@@ -312,21 +116,10 @@ struct sampling_ctx_t *init_sampling_ctx(struct configuration_t *config,int maxd
 		ret->orders[c]=new alps::alea::batch_acc<double>;
 	}
 
-	for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
-	{
-		ret->excitations[c]=new alps::alea::batch_acc<double>;
-	}
-
 	ret->nr_samples=ret->nr_physical_samples=0;
 
 	for(int c=0;c<MAX_ORDER;c++)
 		ret->nr_samples_by_order[c]=ret->nr_positive_samples[c]=ret->nr_negative_samples[c]=0;
-
-#define NR_BLOCKSIZES	(5)
-
-	int blocksizes[NR_BLOCKSIZES]={500,1000,10000,25000,50000};
-
-	ret->sst=init_super_sampler(blocksizes,NR_BLOCKSIZES,config->nrbins,config->binwidth);
 
 	return ret;
 }
@@ -344,25 +137,6 @@ void fini_sampling_ctx(struct sampling_ctx_t *sctx)
 			delete sctx->plus[c];
 			delete sctx->minus[c];
 			delete sctx->orders[c];
-		}
-
-		for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
-		{
-			delete sctx->excitations[c];
-		}
-
-		for(int dimensions=3;dimensions<=sctx->maxdimensions;dimensions++)
-		{
-			if(sctx->bin_mappings[dimensions])
-				free(sctx->bin_mappings[dimensions]);
-
-			if(sctx->topologies[dimensions])
-			{
-				for(int c=0;c<sctx->nr_of_bins[dimensions];c++)
-					delete sctx->topologies[dimensions][c];
-
-				free(sctx->topologies[dimensions]);
-			}
 		}
 
 		free(sctx);
@@ -383,31 +157,16 @@ void sampling_ctx_measure(struct sampling_ctx_t *sctx,struct amatrix_t *amx,stru
 			double sign=(weight>0.0f) ? (1.0f) : (-1.0f);
 
 			int order=amx->pmxs[0]->dimensions;
-			int topology=amatrix_to_topology_index(amx,sctx);
-			int excitation_level=get_excitation_level(amx);
 
 			(*sctx->autocorrelation) << weight;
 			(*sctx->overall_sign) << sign;
 			(*sctx->signs[order]) << sign;
-
-			super_sampler_add_time_sample(sctx->sst,amx->taus[order-1],sign);
 
 			for(int c=0;c<=sctx->maxdimensions;c++)
 			{
 				(*sctx->orders[c]) << ((c!=order) ? (0.0) : (sign));
 				(*sctx->plus[c]) << ((c!=order) ? (0.0) : (fpositive_part(sign)));
 				(*sctx->minus[c]) << ((c!=order) ? (0.0) : (fnegative_part(sign)));
-
-				if(c>=3)
-				{
-					for(int d=0;d<sctx->nr_of_bins[c];d++)
-						(*sctx->topologies[c][d]) << (((c==order)&&(d==topology)) ? (sign) : (0.0));
-				}
-			}
-
-			for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
-			{
-					(*sctx->excitations[c])<<((((order==3)||(order==4))&&(c==excitation_level)) ? (sign):(0.0));
 			}
 
 			sctx->nr_samples_by_order[order]++;
@@ -452,16 +211,7 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 
 	alps::alea::batch_result<double> result_overall_sign, result_signs[MAX_ORDER];
 	alps::alea::batch_result<double> result_plus[MAX_ORDER], result_minus[MAX_ORDER];
-	alps::alea::batch_result<double> result_orders[MAX_ORDER], *result_topologies[MAX_ORDER];
-	alps::alea::batch_result<double> result_excitations[MAX_EXCITATION_LEVEL];
-
-	for(int c=0;c<MAX_ORDER;c++)
-	{
-		result_topologies[c]=(alps::alea::batch_result<double> *)(malloc(sizeof(alps::alea::batch_result<double>)*sctx->nr_of_bins[c]));
-
-		for(int d=0;d<sctx->nr_of_bins[c];d++)
-			new(result_topologies[c]+d) alps::alea::batch_result<double>;
-	}
+	alps::alea::batch_result<double> result_orders[MAX_ORDER];
 
 	if(finalize==true)
 	{
@@ -478,13 +228,6 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 
 		for(int c=0;c<MAX_ORDER;c++)
 			result_orders[c]=sctx->orders[c]->finalize();
-
-		for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
-			result_excitations[c]=sctx->excitations[c]->finalize();
-
-		for(int c=3;c<=sctx->maxdimensions;c++)
-			for(int d=0;d<sctx->nr_of_bins[c];d++)
-				result_topologies[c][d]=sctx->topologies[c][d]->finalize();
 	}
 	else
 	{
@@ -501,13 +244,6 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 
 		for(int c=0;c<MAX_ORDER;c++)
 			result_orders[c]=sctx->orders[c]->result();
-
-		for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
-			result_excitations[c]=sctx->excitations[c]->result();
-
-		for(int c=3;c<=sctx->maxdimensions;c++)
-			for(int d=0;d<sctx->nr_of_bins[c];d++)
-				result_topologies[c][d]=sctx->topologies[c][d]->result();
 	}
 
 	long int total_positive, total_negative;
@@ -588,119 +324,6 @@ void sampling_ctx_print_report(struct sampling_ctx_t *sctx,struct amatrix_t *amx
 		}
 	}
 
-	fprintf(out, "# Topology-by-topology ratios:\n");
-
-	for(int order=3;order<=sctx->maxdimensions;order++)
-	{
-		double ratios=0.0f, sigmaratios=0.0f;
-
-		fprintf(out, "# MP%d\n",order);
-
-		for(int d=0;d<sctx->nr_of_bins[order];d++)
-		{
-			double phi1, phi2, sigmaphi1, sigmaphi2;
-
-			phi1=result_topologies[order][d].mean()(0);
-			phi2=result_orders[2].mean()(0);
-
-			sigmaphi1=result_topologies[order][d].stderror()(0);
-			sigmaphi2=result_orders[2].stderror()(0);
-
-			double ratio, sigmaratio;
-
-			ratio=phi1/phi2;
-			sigmaratio=ratio*sqrt(pow(sigmaphi1/phi1, 2.0f)+pow(sigmaphi2/phi2, 2.0f));
-
-			ratios+=ratio;
-			sigmaratios+=sigmaratio*sigmaratio;
-
-			char buf[256];
-
-			fprintf(out, "MP%d(%s)/MP2 %f +- %f (%f%%)\n", order, get_bin_description(sctx, order, d, buf),
-				ratio, sigmaratio, 100.0f*sigmaratio/ratio);
-		}
-
-		sigmaratios=sqrt(sigmaratios);
-
-		fprintf(out, "MP%d(all)/MP2 %f +- %f (%f%%)\n", order, ratios, sigmaratios, 100.0f*sigmaratios/ratios);
-	}
-
-	fprintf(out, "# Results by excitation level:\n");
-
-	for(int order=4;order<=4;order++)
-	{
-		double ratios=0.0f, sigmaratios=0.0f;
-
-		fprintf(out, "# MP%d\n", order);
-
-		for(int c=0;c<MAX_EXCITATION_LEVEL;c++)
-		{
-			double phi1, phi2, sigmaphi1, sigmaphi2;
-
-			if(gsl_fcmp(result_excitations[c].mean()(0),0.0f,1e-7)==0)
-				continue;
-
-			phi1=result_excitations[c].mean()(0);
-			phi2=result_orders[2].mean()(0);
-
-			sigmaphi1=result_excitations[c].stderror()(0);
-			sigmaphi2=result_orders[2].stderror()(0);
-
-			double ratio, sigmaratio;
-
-			ratio=phi1/phi2;
-			sigmaratio=ratio*sqrt(pow(sigmaphi1/phi1, 2.0f)+pow(sigmaphi2/phi2, 2.0f));
-
-			ratios+=ratio;
-			sigmaratios+=sigmaratio*sigmaratio;
-
-			fprintf(out, "MP4(%d-plets)/MP2 %f +- %f (%f%%)\n", c, ratio, sigmaratio, 100.0f*sigmaratio/ratio);
-		}
-
-		sigmaratios=sqrt(sigmaratios);
-
-		fprintf(out, "MP%d(all)/MP2 %f +- %f (%f%%)\n", order, ratios, sigmaratios, 100.0f*sigmaratios/ratios);
-	}
-
 	fprintf(out,"# Measured autocorrelation time = %f\n",result_autocorrelation.tau()(0));
 	fflush(out);
-
-	for(int c=0;c<MAX_ORDER;c++)
-	{
-		if(result_topologies[c])
-		{
-			for(int d=0;d<sctx->nr_of_bins[c];d++)
-				(result_topologies[c]+d)->~batch_result();
-
-			free(result_topologies[c]);
-		}
-	}
-
-	for(int d=0;d<amx->config->nrbins;d++)
-	{
-		double lower,upper,bincenter;
-
-		block_histogram_get_range(sctx->sst->bhs[0],d,&lower,&upper);
-		bincenter=(lower+upper)/2.0f;
-
-		fprintf(out,"%f ",bincenter);
-
-		for(int k=0;k<NR_BLOCKSIZES;k++)
-		{
-			double mean=block_histogram_get_mean(sctx->sst->bhs[k],d);
-			double sigma=sqrtf(block_histogram_get_variance(sctx->sst->bhs[k],d));
-
-			/*
-				TODO: no normalization as of now.
-			*/
-
-			fprintf(out,"%f %f ",mean,sigma);
-		}
-
-		fprintf(out,"\n");
-	}
-
-	if(finalize==true)
-		fini_super_sampler(sctx->sst);
-
 }

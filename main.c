@@ -33,7 +33,7 @@ int main(int argc,char *argv[])
 			init_permutation_tables(8);
 
 			amatrix_cache_is_enabled=true;
-			init_cache(8);
+			init_cache(6);
 		}
 
 		load_config_defaults(&config);

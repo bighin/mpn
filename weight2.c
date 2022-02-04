@@ -116,7 +116,6 @@ struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t 
 	*/
 
 	double denominators=1.0f;
-	int excitation_level=0;
 
 	for(size_t i=0;i<(B->size1-1);i++)
 	{
@@ -158,21 +157,12 @@ struct weight_info_t incidence_to_weight_info(gsl_matrix_int *B, struct label_t 
 			}
 		}
 
-		double deltatau=amx->taus[i+1]-amx->taus[i];
-
 		if(energies_in_denominator>0)
-			denominators/=fsign(denominator)*exp(-deltatau*fabs(denominator));
-		else
-			denominators/=exp(-deltatau);
-
-		ret.denominators[ret.nr_denominators].deltatau=deltatau;
-		ret.nr_denominators++;
-
-		excitation_level=MAX(excitation_level,energies_in_denominator/2);
-
+		{
+			denominators*=denominator;
+			ret.nr_denominators++;
+		}
 	}
-
-	ret.excitation_level=excitation_level;
 
 	/*
 		Additional rule: phase factor
@@ -294,10 +284,7 @@ double reconstruct_weight(struct amatrix_t *amx, struct weight_info_t *awt)
 			}
 		}
 
-		if(awt->denominators[c].ilabels>0)
-			denominators/=fsign(denominator)*exp(-awt->denominators[c].deltatau*fabs(denominator));
-		else
-			denominators/=exp(-awt->denominators[c].deltatau);
+		denominators*=denominator;
 	}
 
 	double numerators=1.0f;
@@ -340,25 +327,4 @@ int coordinate_to_label_index(struct label_t *labels,int ilabels,int i,int j,int
 
 	assert(false);
 	return 0;
-}
-
-int get_excitation_level(struct amatrix_t *amx)
-{
-	struct label_t labels[MAX_LABELS];
-	int ilabels=0;
-
-#warning This result could be cached with the weight
-
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	if(dimensions==1)
-		return 0;
-	else if(dimensions==2)
-		return 2;
-
-	gsl_matrix_int *incidence=amatrix_calculate_incidence(amx, labels, &ilabels);
-	struct weight_info_t w=incidence_to_weight_info(incidence, labels, &ilabels, amx);
-	gsl_matrix_int_free(incidence);
-
-	return w.excitation_level;
 }

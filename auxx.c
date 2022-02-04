@@ -205,11 +205,6 @@ double fnegative_part(double x)
 	return (x<0.0f)?(-x):(0.0f);
 }
 
-double fsign(double x)
-{
-	return (x>0.0f)?(1.0f):(-1.0f);
-}
-
 /*
 	Returns the n-th character of the string s if it is long enough, otherwise an underscore.
 */
@@ -450,4 +445,16 @@ int cdist_linear_search(const double *cdists, int lo, int hi, double selector)
 
 	assert(false);
 	return 0;
+}
+
+void remove_char(char *s,char c)
+{
+	int j;
+	unsigned long len=strlen(s);
+
+	for (int i=j=0; i<len; i++)
+		if (s[i]!=c)
+			s[j++]=s[i];
+
+	s[j]='\0';
 }

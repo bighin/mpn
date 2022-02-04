@@ -23,7 +23,6 @@ struct amatrix_t
 	*/
 
 	struct pmatrix_t *pmxs[2];
-	double taus[PMATRIX_MAX_DIMENSIONS];
 
 	/*
 		A GSL RNG context
@@ -39,7 +38,7 @@ struct amatrix_t
 	struct energies_ctx_t *ectx;
 
 	/*
-		Various parameters that are read from the configuration file are store here
+		Various parameters that are read from the configuration file are stored here
 	*/
 
 	struct configuration_t *config;
@@ -61,7 +60,6 @@ struct amatrix_backup_t
 {
 	int dimensions[2];
 	int values[2][PMATRIX_MAX_DIMENSIONS][PMATRIX_MAX_DIMENSIONS];
-	double taus[PMATRIX_MAX_DIMENSIONS];
 
 	double cached_result;
 	bool cached_result_is_valid;

@@ -4,5 +4,3 @@
   matrices of different dimensions, of course remembering to zero them.
 
 - One could cache the result of count_loops(), as well.
-
-- If not used, remove the Lindeloef factor

@@ -17,6 +17,9 @@
 
 #include "libprogressbar/progressbar.h"
 
+#define MODIFY_REPEATS		(1)
+#define MODIFY_PROBABILITY	(1)
+
 /*
 	The updates
 */
@@ -32,14 +35,7 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	double maxtau=amx->config->maxtau;
-	double lasttau=amx->taus[dimensions-1];
-
-	assert(maxtau>lasttau);
-
-	extend_probability=1.0f/pow(dimensions+1,2.0f)/pow(amx->nr_occupied*amx->nr_virtual,2.0f)/(maxtau-lasttau);
+	extend_probability=1.0f/pow(amx->pmxs[0]->dimensions+1, 2.0f)/pow(amx->nr_occupied*amx->nr_virtual,2.0f);
 	squeeze_probability=1.0f;
 
 	int i1, j1, i2, j2;
@@ -49,8 +45,6 @@ int update_extend(struct amatrix_t *amx, bool always_accept)
 
 	pmatrix_set_raw_entry(amx->pmxs[0],i1,j1,pmatrix_get_new_value(amx->pmxs[0],amx->rng_ctx,i1,j1));
 	pmatrix_set_raw_entry(amx->pmxs[1],i2,j2,pmatrix_get_new_value(amx->pmxs[1],amx->rng_ctx,i2,j2));
-
-	amx->taus[dimensions]=lasttau+gsl_rng_uniform_pos(amx->rng_ctx)*(maxtau-lasttau);
 
 	amx->cached_weight_is_valid=false;
 
@@ -86,14 +80,7 @@ int update_squeeze(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	double maxtau=amx->config->maxtau;
-	double lasttau=amx->taus[dimensions-2];
-
-	assert(maxtau>lasttau);
-
-	extend_probability=1.0f/pow(dimensions, 2.0f)/pow(amx->nr_occupied*amx->nr_virtual,2.0f)/(maxtau-lasttau);
+	extend_probability=1.0f/pow(amx->pmxs[0]->dimensions, 2.0f)/pow(amx->nr_occupied*amx->nr_virtual,2.0f);
 	squeeze_probability=1.0f;
 
 	pmatrix_squeeze(amx->pmxs[0], amx->rng_ctx);
@@ -202,7 +189,7 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	for(int repeats=0;repeats<5;repeats++)
+	for(int repeats=0;repeats<MODIFY_REPEATS;repeats++)
 	{
 		/*
 			We select which one of the permutation matrices we want to play with
@@ -451,58 +438,6 @@ int update_flip2(struct amatrix_t *amx, bool always_accept)
 	return UPDATE_ACCEPTED;
 }
 
-int update_changetau(struct amatrix_t *amx, bool always_accept)
-{
-	int dimensions=amx->pmxs[0]->dimensions;
-
-	assert(amx->pmxs[0]->dimensions==amx->pmxs[1]->dimensions);
-	assert(amx->pmxs[0]->dimensions>=1);
-
-	double weightratio=1.0f/fabs(amatrix_weight(amx));
-
-	struct amatrix_backup_t backup;
-	amatrix_save(amx, &backup);
-
-	int selector=gsl_rng_uniform_int(amx->rng_ctx, dimensions);
-
-	double maxtau=amx->config->maxtau;
-
-	double starttau=(selector==0)?(0.0f):(amx->taus[selector-1]);
-	double endtau=(selector==(dimensions-1))?(maxtau):(amx->taus[selector+1]);
-
-	assert(endtau>=starttau);
-
-	amx->taus[selector]=starttau+gsl_rng_uniform_pos(amx->rng_ctx)*(endtau-starttau);
-
-	if(selector>0)
-		assert(amx->taus[selector]>=amx->taus[selector-1]);
-
-	if(selector<(dimensions-1))
-		assert(amx->taus[selector]<=amx->taus[selector+1]);
-
-	amx->cached_weight_is_valid=false;
-
-	/*
-		The update is balanced with itself, the acceptance ratio is simply given
-		by the (modulus of the) weights ratio.
-	*/
-
-	double acceptance_ratio;
-
-	weightratio*=fabs(amatrix_weight(amx));
-	acceptance_ratio=weightratio;
-
-	bool is_accepted=(gsl_rng_uniform(amx->rng_ctx)<acceptance_ratio)?(true):(false);
-
-	if((is_accepted==false)&&(always_accept==false))
-	{
-		amatrix_restore(amx, &backup);
-		return UPDATE_REJECTED;
-	}
-
-	return UPDATE_ACCEPTED;
-}
-
 /*
 	Auxiliary functions
 */
@@ -556,7 +491,7 @@ static void signal_handler(int signo)
 int do_diagmc(struct configuration_t *config)
 {
 
-#define DIAGRAM_NR_UPDATES        (8)
+#define DIAGRAM_NR_UPDATES        (7)
 
 	int (*updates[DIAGRAM_NR_UPDATES])(struct amatrix_t *amx, bool always_accept);
 	const char *update_names[DIAGRAM_NR_UPDATES];
@@ -575,7 +510,6 @@ int do_diagmc(struct configuration_t *config)
 	updates[4]=update_swap;
 	updates[5]=update_flip1;
 	updates[6]=update_flip2;
-	updates[7]=update_changetau;
 
 	update_names[0]="Extend";
 	update_names[1]="Squeeze";
@@ -584,21 +518,19 @@ int do_diagmc(struct configuration_t *config)
 	update_names[4]="Swap";
 	update_names[5]="Flip1";
 	update_names[6]="Flip2";
-	update_names[7]="ChangeTau";
 
 	/*
 		Update probabilities: note that they must be the same for complementary update pairs,
-		see the assert() below.
+		see the assert()'s below.
 	*/
 
 	update_probability[0]=1;
 	update_probability[1]=1;
 	update_probability[2]=1;
-	update_probability[3]=1;
-	update_probability[4]=1;
+	update_probability[3]=MODIFY_PROBABILITY;
+	update_probability[4]=0;
 	update_probability[5]=0;
 	update_probability[6]=0;
-	update_probability[7]=1;
 
 	assert(update_probability[0]==update_probability[1]);
 
@@ -618,7 +550,7 @@ int do_diagmc(struct configuration_t *config)
 	for(int d=0;d<DIAGRAM_NR_UPDATES;d++)
 		proposed[d]=accepted[d]=rejected[d]=0;
 
-	struct sampling_ctx_t *sctx=init_sampling_ctx(config,config->maxorder);
+	struct sampling_ctx_t *sctx=init_sampling_ctx(config->maxorder);
 
 	/*
 		We print some informative message, and then we open the log file
@@ -659,13 +591,29 @@ int do_diagmc(struct configuration_t *config)
 	assert(config->maxorder>config->minorder);
 	assert(config->maxorder<MAX_ORDER);
 
+	struct amatrix_backup_t root;
+	amatrix_save(amx,&root);
+
 	while(amx->pmxs[0]->dimensions<config->minorder)
 	{
 		struct amatrix_backup_t backup;
 
 		amatrix_save(amx,&backup);
-		update_extend(amx, true);
 
+		int c=0;
+		while(update_extend(amx, false)!=UPDATE_ACCEPTED)
+		{
+			/*
+				If we get stuck, we can go back to the very beginning.
+			*/
+			
+			if(++c>32768)
+			{
+				amatrix_restore(amx, &root);
+				break;
+			}
+		}
+		
 		if(amatrix_check_connectedness(amx)==false)
 			amatrix_restore(amx, &backup);
 	}
@@ -817,7 +765,6 @@ int do_diagmc(struct configuration_t *config)
 	fprintf(out,"# Unphysical penalty: %f\n",config->unphysicalpenalty);
 	fprintf(out,"# Minimum order: %d\n",config->minorder);
 	fprintf(out,"# Maximum order: %d\n",config->maxorder);
-	fprintf(out,"# Epsilon (for Lindelöf resummation): %f\n",config->epsilon);
 	fprintf(out,"#\n");
 
 	fprintf(out,"# Iterations (done/planned): %ld/%ld\n",counter,config->iterations);
