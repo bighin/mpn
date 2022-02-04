@@ -1,9 +1,14 @@
 import time
+import sys
 import numpy as np
 import psi4
 
 def print_array(ar):
         print(' '.join(map(str, ar)))
+
+if (len(sys.argv) != 2):
+    print("Usage: ", sys.argv[0], "<basis>")
+    sys.exit()
 
 # Set memory
 psi4.set_memory('2 GB', quiet=True)
@@ -17,7 +22,7 @@ H 1 1.23
 symmetry c1
 """)
 
-psi4.set_options({'basis': '6-31G',
+psi4.set_options({'basis': sys.argv[1],
                   'scf_type': 'pk',
                   'mp2_type': 'conv',
                   'freeze_core': 'false',
@@ -115,9 +120,3 @@ print("MP2/MP3: ",order2/order3)
 print("MP3/MP4: ",order3/order4)
 print("MP4/MP5: ",order4/order5)
 print("MP5/MP6: ",order5/order6)
-
-print("")
-print("MP2/MP3: ",order2/order3)
-print("MP2/MP4: ",order2/order4)
-print("MP2/MP5: ",order2/order5)
-print("MP2/MP6: ",order2/order6)

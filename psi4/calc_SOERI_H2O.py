@@ -1,9 +1,14 @@
 import time
+import sys
 import numpy as np
 import psi4
 
 def print_array(ar):
         print(' '.join(map(str, ar)))
+
+if (len(sys.argv) != 2):
+    print("Usage: ", sys.argv[0], "<basis>")
+    sys.exit()
 
 # Set memory
 psi4.set_memory('2 GB', quiet=True)
@@ -18,7 +23,7 @@ H 1 0.96 2 104.5
 symmetry c1
 """)
 
-psi4.set_options({'basis': '6-31G',
+psi4.set_options({'basis': sys.argv[1],
                   'scf_type': 'pk',
                   'mp2_type': 'conv',
                   'freeze_core': 'false',
