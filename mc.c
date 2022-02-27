@@ -402,7 +402,7 @@ int update_flip2(struct amatrix_t *amx, bool always_accept)
 		for(size_t j=0;j<dimensions;j++)
 		{
 			int iprime=get_permutation(dimensions,selectori,i)-1;
-			int jprime=get_permutation(dimensions,selectori,j)-1;
+			int jprime=get_permutation(dimensions,selectorj,j)-1;
 
 			amx->pmxs[0]->values[iprime][jprime]=backup.values[0][i][j];
 			amx->pmxs[1]->values[iprime][jprime]=backup.values[1][i][j];
