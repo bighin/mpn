@@ -17,9 +17,6 @@
 
 #include "libprogressbar/progressbar.h"
 
-#define MODIFY_REPEATS		(1)
-#define MODIFY_PROBABILITY	(1)
-
 /*
 	The updates
 */
@@ -189,25 +186,22 @@ int update_modify(struct amatrix_t *amx, bool always_accept)
 	struct amatrix_backup_t backup;
 	amatrix_save(amx, &backup);
 
-	for(int repeats=0;repeats<MODIFY_REPEATS;repeats++)
-	{
-		/*
-			We select which one of the permutation matrices we want to play with
-		*/
+	/*
+		We select which one of the permutation matrices we want to play with
+	*/
 
-		struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
+	struct pmatrix_t *target=amx->pmxs[gsl_rng_uniform_int(amx->rng_ctx, 2)];
 
-		/*
-			We select the row the element we want to modify lies in. Since there's one
-			and only one element per row, we do not need to select a column.
-		*/
+	/*
+		We select the row the element we want to modify lies in. Since there's one
+		and only one element per row, we do not need to select a column.
+	*/
 
-		int i=gsl_rng_uniform_int(amx->rng_ctx, dimensions);
+	int i=gsl_rng_uniform_int(amx->rng_ctx, dimensions);
 
-		for(int j=0;j<dimensions;j++)
-			if(pmatrix_get_entry(target, i, j)!=0)
-				pmatrix_set_raw_entry(target, i, j, pmatrix_get_new_value(target, amx->rng_ctx, i, j));
-	}
+	for(int j=0;j<dimensions;j++)
+		if(pmatrix_get_entry(target, i, j)!=0)
+			pmatrix_set_raw_entry(target, i, j, pmatrix_get_new_value(target, amx->rng_ctx, i, j));
 
 	amx->cached_weight_is_valid=false;
 
@@ -527,10 +521,10 @@ int do_diagmc(struct configuration_t *config)
 	update_probability[0]=1;
 	update_probability[1]=1;
 	update_probability[2]=1;
-	update_probability[3]=MODIFY_PROBABILITY;
-	update_probability[4]=0;
-	update_probability[5]=0;
-	update_probability[6]=0;
+	update_probability[3]=1;
+	update_probability[4]=1;
+	update_probability[5]=1;
+	update_probability[6]=1;
 
 	assert(update_probability[0]==update_probability[1]);
 
