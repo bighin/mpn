@@ -9,7 +9,7 @@
 #include "limits.h"
 
 /*
-	This structure saves most of the intermediate results that can be used to recalculated the weight after
+	This structure saves most of the intermediate results that can be used to recalculate the weight after
 	having modified a quantum number
 */
 
