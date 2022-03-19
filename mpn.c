@@ -288,8 +288,7 @@ double incidence_to_weight(gsl_matrix_int *B, struct label_t *labels, int *ilabe
 		printf("Final weight: %f\n",pow(inversefactor,-1.0f)*numerators/denominators);
 
 	/*
-		Finally we put all the results into an 'amatrix_weight_t' struct and
-		we return it.
+		Lastly, we can return the final result.
 	*/
 
 	return pow(inversefactor,-1.0f)*numerators/denominators/amatrix_multiplicity(amx);

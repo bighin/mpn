@@ -14,6 +14,7 @@
 #include "permutations.h"
 #include "weight.h"
 #include "sampling.h"
+#include "rfactors.h"
 
 #include "libprogressbar/progressbar.h"
 
@@ -545,6 +546,7 @@ int do_diagmc(struct configuration_t *config)
 		proposed[d]=accepted[d]=rejected[d]=0;
 
 	struct sampling_ctx_t *sctx=init_sampling_ctx(config->maxorder);
+	rfactors_init();
 
 	/*
 		We print some informative message, and then we open the log file
@@ -811,6 +813,17 @@ int do_diagmc(struct configuration_t *config)
 	*/
 
 	sampling_ctx_print_report(sctx,amx,out,true);
+
+	/*
+		...the additional 'rfactors' statistics...
+	*/
+
+	char output2[1024];
+
+	snprintf(output2,1024,"%s.rfactors.dat",config->prefix);
+	output2[1023]='\0';
+
+	rfactors_output_summary(output2);
 
 	/*
 		...and we perform some final cleanups!
